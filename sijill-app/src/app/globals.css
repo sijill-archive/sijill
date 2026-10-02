@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply m-0 bg-[#f8f7f2] text-stone-900 dark:bg-[#151916] dark:text-stone-100;
+  }
+
+  ::selection {
+    @apply bg-orange-200 text-emerald-950;
+  }
+}
+
+.map-aura {
+  background: radial-gradient(circle, rgba(166, 197, 160, .38) 0%, rgba(191, 210, 176, .18) 38%, rgba(248, 247, 242, 0) 72%);
+}
+
+.map-ground {
+  background: radial-gradient(ellipse, rgba(30, 54, 43, .32) 0%, rgba(38, 67, 52, .12) 48%, transparent 75%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .map-aura {
+    background: radial-gradient(circle, rgba(62, 115, 88, .28) 0%, rgba(58, 94, 72, .13) 42%, rgba(19, 25, 22, 0) 74%);
+  }
+
+  .map-ground {
+    background: radial-gradient(ellipse, rgba(0, 0, 0, .56) 0%, rgba(0, 0, 0, .22) 48%, transparent 75%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
