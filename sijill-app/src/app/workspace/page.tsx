@@ -41,7 +41,7 @@ export default function WorkspacePage() {
             const card = <><h2 className="font-semibold">{action.title}</h2><p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-400">{action.description}</p>{!action.href && <span className="mt-4 inline-block text-xs text-[#98704b]">سيُفعّل في المرحلة التالية</span>}</>;
             return action.href
               ? <Link key={action.title} href={action.href} className="rounded-2xl border border-[#dfe2d9] bg-white p-5 transition hover:border-[#8aa291] dark:border-stone-800 dark:bg-[#1a211d]">{card}</Link>
-              : <section key={action.title} aria-disabled="true" className="rounded-2xl border border-[#dfe2d9] bg-white/60 p-5 dark:border-stone-800 dark:bg-[#1a211d]/60">{card}</section>;
+              : <section key={action.title} className="rounded-2xl border border-[#dfe2d9] bg-white/60 p-5 dark:border-stone-800 dark:bg-[#1a211d]/60">{card}</section>;
           })}
         </div>
         <p className="mt-8 rounded-xl border border-[#e4dfd2] bg-[#f1eee5] px-4 py-3 text-xs leading-6 text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400">تُضاف الشهادة دائماً داخل قضية أو ملف شخصي؛ المحافظة والمنطقة تستخدمان لتصفية البحث فقط.</p>

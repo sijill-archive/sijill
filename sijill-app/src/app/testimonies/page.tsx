@@ -81,10 +81,10 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
   return (
     <main className="min-h-screen bg-[#f8f7f2] dark:bg-[#151916]">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
-        <a href="/" className="flex items-center gap-3 text-lg font-bold text-emerald-950 dark:text-stone-100">
+        <Link href="/" className="flex items-center gap-3 text-lg font-bold text-emerald-950 dark:text-stone-100">
           <span className="grid size-10 place-items-center rounded-full bg-emerald-950 text-xl text-white dark:bg-emerald-200 dark:text-emerald-950">س</span> سِجِلّ
-        </a>
-        <a href="/" className="rounded-full bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 dark:bg-emerald-200 dark:text-emerald-950 dark:hover:bg-emerald-100">استكشف الخريطة</a>
+        </Link>
+        <Link href="/" className="rounded-full bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 dark:bg-emerald-200 dark:text-emerald-950 dark:hover:bg-emerald-100">استكشف الخريطة</Link>
       </header>
 
       <section className="mx-auto max-w-6xl px-5 pb-16 pt-8 sm:px-8 sm:pt-14">
