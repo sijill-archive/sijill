@@ -41,7 +41,8 @@ export function AleppoExplorer() {
   useEffect(() => {
     const restoreLayer = () => {
       const id = window.history.state?.aleppoDistrict as string | undefined;
-      setSelectedId(aleppoMap.districts.some((district) => district.id === id) ? id : null);
+      const district = aleppoMap.districts.find((item) => item.id === id);
+      setSelectedId(district?.id ?? null);
     };
     window.addEventListener("popstate", restoreLayer);
     return () => window.removeEventListener("popstate", restoreLayer);
