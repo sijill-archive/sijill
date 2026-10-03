@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "سِجِلّ — أرشيف الذاكرة المدنية",
+  "short_name": "سِجِلّ",
+  "description": "منصة لحفظ وتوثيق الذاكرة السورية.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f7f2",
+  "theme_color": "#173b30",
+  "icons": [
+    {
+      "src": "/icons/sijill-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/sijill-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/sijill-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
