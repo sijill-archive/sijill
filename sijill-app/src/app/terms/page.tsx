@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 export const metadata: Metadata = {
   title: "الشروط والأحكام | سِجِلّ",
@@ -101,7 +102,7 @@ export default function TermsPage() {
   return (
     <main className="min-h-screen bg-[#f8f7f2] text-[#1c2922] dark:bg-[#131916] dark:text-[#f1f1e9]">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 sm:px-8">
-        <Link href="/" className="font-serif text-2xl font-bold text-[#194537] dark:text-[#c0dec2]">سِجِلّ</Link>
+        <Link href="/" aria-label="سِجِلّ، الصفحة الرئيسية"><BrandLogo className="h-12 w-12" /></Link>
         <Link href="/" className="text-sm text-stone-600 transition hover:text-[#194537] dark:text-stone-300 dark:hover:text-[#c0dec2]">العودة إلى الرئيسية</Link>
       </header>
       <article className="mx-auto max-w-4xl px-5 pb-16 pt-7 sm:px-8 sm:pt-12">

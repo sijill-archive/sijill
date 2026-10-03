@@ -1,5 +1,6 @@
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -81,8 +82,8 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
   return (
     <main className="min-h-screen bg-[#f8f7f2] dark:bg-[#151916]">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
-        <Link href="/" className="flex items-center gap-3 text-lg font-bold text-emerald-950 dark:text-stone-100">
-          <span className="grid size-10 place-items-center rounded-full bg-emerald-950 text-xl text-white dark:bg-emerald-200 dark:text-emerald-950">س</span> سِجِلّ
+        <Link href="/" aria-label="سِجِلّ، الصفحة الرئيسية" className="flex items-center gap-3">
+          <BrandLogo className="h-12 w-12" />
         </Link>
         <Link href="/" className="rounded-full bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 dark:bg-emerald-200 dark:text-emerald-950 dark:hover:bg-emerald-100">استكشف الخريطة</Link>
       </header>

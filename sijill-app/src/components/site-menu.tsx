@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
@@ -36,7 +37,7 @@ export function SiteMenu() {
       {open && <>
         <motion.button aria-label="إغلاق القائمة" className="fixed inset-0 z-50 cursor-default bg-black/30 backdrop-blur-[2px]" onClick={close} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
         <motion.aside role="dialog" aria-modal="true" aria-label="القائمة الرئيسية" className="fixed inset-y-0 right-0 z-[51] flex w-[min(86vw,360px)] flex-col overflow-y-auto bg-[#f8f7f2] p-7 shadow-2xl dark:bg-[#171e1a]" initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 260 }}>
-          <div className="flex items-center justify-between"><Link href="/" onClick={close} className="text-2xl font-bold text-[#194537] dark:text-[#c0dec2]">سِجِلّ</Link></div>
+          <div className="flex items-center justify-between"><Link href="/" onClick={close} aria-label="سِجِلّ، الصفحة الرئيسية"><BrandLogo className="h-14 w-14" /></Link></div>
           <Link href="/" onClick={close} className="mt-8 rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">الصفحة الرئيسية</Link>
           {signedInEmail ? <>
             <p className="mt-5 break-all text-xs text-stone-500" dir="ltr">{signedInEmail}</p>

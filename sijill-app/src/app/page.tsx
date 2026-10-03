@@ -1,13 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import mapData from "@/data/syria-governorates.json";
 import localityPoints from "@/data/syria-locality-points.json";
 import { ContributionButtons } from "@/components/site-menu";
+import { BrandLogo } from "@/components/brand-logo";
 
 type Governorate = (typeof mapData.features)[number];
 
@@ -162,12 +162,13 @@ export default function Home() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#f8f7f2] text-[#1c2922] dark:bg-[#131916] dark:text-[#f1f1e9]">
       <div className="fixed inset-x-0 top-0 z-40 flex min-h-10 items-center justify-center bg-[#173b30] px-4 py-2 text-center text-xs leading-5 text-[#f3f2e8] sm:text-sm">
-        <span>سِجِلّ — منصة لحفظ وتوثيق الذاكرة السورية</span>
+        <BrandLogo tone="white" className="ml-2 h-6 w-6 shrink-0" />
+        <span>منصة لحفظ وتوثيق الذاكرة السورية</span>
       </div>
 
       <header className="relative mx-auto flex max-w-7xl items-center justify-center px-5 pb-5 pt-[4.75rem] sm:px-8 lg:px-12">
         <Link href="/" className="text-center" aria-label="سِجِلّ، الصفحة الرئيسية">
-          <Image src="/logo.png" alt="سِجِلّ" width={150} height={84} priority className="mx-auto h-auto w-48 sm:w-64" />
+          <BrandLogo priority className="mx-auto h-auto w-28 sm:w-36" />
           <span className="mt-2 block text-xs tracking-[.28em] text-[#986d3e] sm:text-sm">منصة توثيق الذاكرة السورية</span>
           <span className="mt-2 hidden text-xs text-stone-500 dark:text-stone-400 sm:block">منصة لحفظ وتوثيق الشهادات والأحداث والأدلة التاريخية</span>
           <span className="mx-auto mt-3 hidden max-w-3xl text-sm leading-8 text-stone-600 dark:text-stone-300 sm:block sm:text-base">
@@ -214,7 +215,7 @@ export default function Home() {
       </section>
 
       <footer className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-5 py-7 text-xs text-stone-500 dark:text-stone-400 sm:flex-row sm:px-8 lg:px-12">
-        <Link href="/" className="font-semibold text-[#194537] dark:text-[#c0dec2]">سِجِلّ</Link><div className="flex flex-wrap justify-center gap-5"><span>سياسة الخصوصية</span><Link href="/terms" className="transition hover:text-[#194537] dark:hover:text-[#c0dec2]">الشروط والأحكام</Link><span>معلومات التواصل</span></div><span dir="ltr">Sijill © 2026</span>
+        <Link href="/" aria-label="سِجِلّ، الصفحة الرئيسية"><BrandLogo className="h-9 w-9" /></Link><div className="flex flex-wrap justify-center gap-5"><span>سياسة الخصوصية</span><Link href="/terms" className="transition hover:text-[#194537] dark:hover:text-[#c0dec2]">الشروط والأحكام</Link><span>معلومات التواصل</span></div><span dir="ltr">Sijill © 2026</span>
       </footer>
       <p className="mx-auto max-w-7xl px-5 pb-4 text-center text-[10px] leading-5 text-stone-400 sm:px-8 lg:px-12">الحدود الإدارية: <a className="underline underline-offset-2 hover:text-stone-600" href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a> (2017). مواقع المدن: <a className="underline underline-offset-2 hover:text-stone-600" href="https://opensyria.org/datasets/geography" target="_blank" rel="noreferrer">بيانات OpenSyria الجغرافية، الإصدار 0.1.5</a>.</p>
     </main>

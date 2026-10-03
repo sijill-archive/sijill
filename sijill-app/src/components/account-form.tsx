@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
@@ -209,7 +210,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
     <main className="grid min-h-screen place-items-center bg-[#f8f7f2] px-5 py-12 text-[#1c2922] dark:bg-[#131916] dark:text-[#f1f1e9]">
       <section className="w-full max-w-lg rounded-3xl border border-[#e0e2d9] bg-white p-6 shadow-sm dark:border-stone-800 dark:bg-[#1a211d] sm:p-9">
         <header className="text-center">
-          <Link href="/" className="font-serif text-3xl font-bold text-[#194537] dark:text-[#c0dec2]">سِجِلّ</Link>
+          <Link href="/" aria-label="سِجِلّ، الصفحة الرئيسية" className="inline-flex"><BrandLogo className="h-16 w-16" /></Link>
           <h1 className="mt-6 text-2xl font-semibold">{verified ? "جارٍ تسجيل الدخول" : recovery ? "نسيت كلمة المرور؟" : updatePassword ? "اختر كلمة مرور جديدة" : signup ? "إنشاء حسابك في سِجِلّ" : "مرحباً بعودتك"}</h1>
           <p className="mt-3 text-sm leading-7 text-stone-600 dark:text-stone-400">
             {verified ? "جارٍ إكمال التحقق وإعادتك إلى المكان الذي أردت الوصول إليه..." : recovery ? "أدخل البريد المرتبط بحسابك، وسنرسل رابطاً آمناً لاختيار كلمة مرور جديدة." : updatePassword ? "اكتب كلمة مرور جديدة ثم أكدها لإكمال استعادة الحساب." : signup ? "أنشئ حساباً للمساهمة في حفظ الشهادات والأحداث. سنرسل رابط تأكيد لبريدك." : "سجّل الدخول لمتابعة مساهماتك في الأرشيف."}

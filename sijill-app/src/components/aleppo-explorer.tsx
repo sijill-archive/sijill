@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { useEffect, useState } from "react";
 import aleppoMap from "@/data/aleppo-explorer.json";
 import { ContributionButtons } from "@/components/site-menu";
@@ -69,7 +70,7 @@ export function AleppoExplorer() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#101713] text-[#eff3e9]">
       <header className="mx-auto flex max-w-7xl items-center justify-between px-5 pb-6 pt-8 sm:px-8 lg:px-12">
-        <Link href="/" className="font-serif text-2xl font-bold tracking-wide text-[#d2e5d0]">سِجِلّ</Link>
+        <Link href="/" aria-label="سِجِلّ، الصفحة الرئيسية"><BrandLogo tone="white" className="h-12 w-12" /></Link>
         <p className="text-xs text-[#92aa98]">أرشيف الذاكرة السورية</p>
       </header>
 
