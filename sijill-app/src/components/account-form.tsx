@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { SITE_URL } from "@/lib/site-url";
 
 type AccountMode = "signup" | "login" | "verified" | "recovery" | "update-password";
 
@@ -103,7 +104,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
       if (recovery) {
         window.localStorage.setItem("sijill_after_auth", nextPath);
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: `${window.location.origin}/account?mode=update-password`,
+          redirectTo: `${SITE_URL}/account?mode=update-password`,
         });
         if (error) throw error;
         setMessage("إذا كان هذا البريد مرتبطاً بحساب، فستصلك رسالة فيها رابط آمن لتغيير كلمة المرور. افحص البريد غير المرغوب فيه أيضاً.");
@@ -125,7 +126,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
             email: email.trim(),
             password,
             options: {
-              emailRedirectTo: `${window.location.origin}/account?mode=verified`,
+              emailRedirectTo: `${SITE_URL}/account?mode=verified`,
               data: { first_name: firstName.trim(), last_name: lastName.trim(), date_of_birth: birthDate, governorate },
             },
           })
@@ -170,7 +171,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: email.trim(),
-        options: { emailRedirectTo: `${window.location.origin}/account?mode=verified` },
+        options: { emailRedirectTo: `${SITE_URL}/account?mode=verified` },
       });
       if (error) throw error;
       setCanResendConfirmation(false);
@@ -197,7 +198,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
     window.localStorage.setItem("sijill_after_auth", nextPath);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/account?mode=verified` },
+      options: { redirectTo: `${SITE_URL}/account?mode=verified` },
     });
     if (error) {
       window.localStorage.removeItem("sijill_after_auth");
