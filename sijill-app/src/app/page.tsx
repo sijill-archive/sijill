@@ -30,6 +30,22 @@ const places: Record<string, string[]> = {
 };
 
 const linkToCity = (city: string) => `/locations/${encodeURIComponent(city)}`;
+const governorateSlugs: Record<string, string> = {
+  "دمشق": "damascus",
+  "حلب": "aleppo",
+  "ريف دمشق": "rural-damascus",
+  "حمص": "homs",
+  "حماة": "hama",
+  "اللاذقية": "lattakia",
+  "إدلب": "idlib",
+  "الحسكة": "al-hasakeh",
+  "دير الزور": "deir-ez-zor",
+  "طرطوس": "tartous",
+  "الرقة": "ar-raqqa",
+  "درعا": "daraa",
+  "السويداء": "as-sweida",
+  "القنيطرة": "quneitra",
+};
 
 function focusViewBox(governorate: Governorate) {
   const { bounds, name } = governorate;
@@ -144,13 +160,8 @@ export default function Home() {
     return () => window.removeEventListener("popstate", restoreMap);
   }, []);
   const chooseGovernorate = (feature: Governorate) => {
-    if (feature.english === "Aleppo") {
-      router.push("/governorates/aleppo");
-      return;
-    }
-    setSelected(feature);
-    const state = { ...(window.history.state ?? {}), sijillGovernorate: feature.iso };
-    window.history.pushState(state, "", `${window.location.pathname}${window.location.search}#map-${feature.iso}`);
+    const slug = governorateSlugs[feature.name];
+    if (slug) router.push(`/governorates/${slug}`);
   };
   const showFullMap = () => {
     setSelected(null);

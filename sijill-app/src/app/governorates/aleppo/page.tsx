@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AleppoExplorer } from "@/components/aleppo-explorer";
+import { ProvinceExplorer } from "@/components/province-explorer";
 
 export const metadata: Metadata = {
   title: "محافظة حلب | سِجِلّ",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AleppoPage() {
-  return <AleppoExplorer />;
+  return <ProvinceExplorer slug="aleppo" />;
 }
