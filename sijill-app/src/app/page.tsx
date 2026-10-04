@@ -8,6 +8,7 @@ import mapData from "@/data/syria-governorates.json";
 import localityPoints from "@/data/syria-locality-points.json";
 import { ContributionButtons } from "@/components/site-menu";
 import { BrandLogo } from "@/components/brand-logo";
+import { StatisticsStrip } from "@/components/statistics-strip";
 
 type Governorate = (typeof mapData.features)[number];
 
@@ -158,6 +159,20 @@ export default function Home() {
   };
   const regions = useMemo(() => [...mapData.features].map((feature) => feature.name).sort((a,b) => a.localeCompare(b, "ar")), []);
   const availableCities = governorate ? places[governorate] ?? [] : [...new Set(Object.values(places).flat())].sort((a,b) => a.localeCompare(b, "ar"));
+  const mappedPlaceCount = Object.values(places).reduce((total, list) => total + list.length, 0);
+  const mapStatistics = selected
+    ? [
+        { label: "المناطق", value: selected.english === "Aleppo" ? "10" : "—" },
+        { label: "المدن والبلدات المدرجة", value: (places[selected.name] ?? []).length },
+        { label: "الملفات", value: 0 },
+        { label: "الشهادات", value: 0 },
+      ]
+    : [
+        { label: "المحافظات", value: mapData.features.length },
+        { label: "المدن والبلدات المدرجة", value: mappedPlaceCount },
+        { label: "الملفات", value: 0 },
+        { label: "الشهادات", value: 0 },
+      ];
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#f8f7f2] text-[#1c2922] dark:bg-[#131916] dark:text-[#f1f1e9]">
@@ -182,18 +197,18 @@ export default function Home() {
       <section aria-label="خريطة سوريا التفاعلية" className="relative mx-auto flex min-h-0 max-w-7xl flex-col items-center justify-start px-5 pb-8 pt-0 sm:px-8">
         <div className="map-aura pointer-events-none absolute left-1/2 top-1/2 -z-0 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full sm:h-[760px] sm:w-[760px]" />
         <div className="map-ground pointer-events-none absolute bottom-16 left-1/2 -z-0 h-16 w-[58%] max-w-[426px] -translate-x-1/2 rounded-[100%] blur-2xl" />
+        <StatisticsStrip items={mapStatistics} className="relative z-10 mb-2 w-full max-w-[867px]" />
         <div className="relative z-10 flex w-full max-w-[867px] items-center justify-center">
           <SyrianMap selected={selected} onChoose={chooseGovernorate} />
         </div>
         {selected && <div className="relative z-10 mt-4"><ContributionButtons /></div>}
-        <div className="relative z-10 mt-0 text-center"><p className="font-serif text-xl text-[#194537] dark:text-[#c0dec2]">ذاكرةٌ تحفظها الأماكن</p><p className="mt-2 text-xs text-stone-500 dark:text-stone-400">{selected ? `مناطق بارزة في محافظة ${selected.name}` : "مرّر المؤشر على محافظة لعرض اسمها، واضغط عليها لتكبيرها"}</p></div>
+        <div className="relative z-10 mt-0 text-center"><p className="font-serif text-xl text-[#194537] dark:text-[#c0dec2]">ذاكرةٌ تحفظها الأماكن</p></div>
         <AnimatePresence>
           {selected && <motion.div key={selected.iso} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="relative z-10 mt-5 w-full max-w-[640px] border-y border-[#dce2d8] py-4 dark:border-stone-700">
             <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-[#194537] dark:text-[#c0dec2]">أبرز المدن والمناطق — {selected.name}</h2><button type="button" onClick={showFullMap} className="shrink-0 rounded-full px-3 py-1.5 text-xs text-stone-600 underline underline-offset-2 hover:text-[#194537] dark:text-stone-300">رجوع للخريطة الكاملة</button></div>
             <div className="flex flex-wrap justify-center gap-x-5 gap-y-2">{(places[selected.name] ?? [selected.name]).map((place) => <Link key={place} href={linkToCity(place)} className="border-b border-[#b9cbbd] px-1 py-1 text-sm text-[#285744] transition hover:border-[#285744] hover:text-[#173b30] dark:border-stone-600 dark:text-[#d0e4cd]">{place}</Link>)}</div>
           </motion.div>}
         </AnimatePresence>
-        <p className="absolute bottom-3 px-4 text-center text-[10px] leading-5 text-stone-400">حدود المحافظات الإدارية مرجعية، مستندة إلى geoBoundaries (تمثيل 2017)، ولا تعرض خطوط السيطرة.</p>
       </section>
 
       <section aria-labelledby="featured-heading" className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-12">

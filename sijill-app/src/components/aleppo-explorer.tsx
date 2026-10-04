@@ -6,6 +6,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { useEffect, useState } from "react";
 import aleppoMap from "@/data/aleppo-explorer.json";
 import { ContributionButtons } from "@/components/site-menu";
+import { StatisticsStrip } from "@/components/statistics-strip";
 
 type District = (typeof aleppoMap.districts)[number];
 
@@ -84,9 +85,11 @@ export function AleppoExplorer() {
 
         <div className="mb-8 flex flex-col gap-5 border-y border-white/10 py-5 lg:flex-row lg:items-end lg:justify-between">
           <div><p className="text-[10px] tracking-[.24em] text-[#c9a76b]">استكشف حسب المكان</p><h1 className="mt-2 text-3xl font-semibold sm:text-4xl">محافظة حلب</h1><p className="mt-2 text-xs leading-6 text-[#a5b3a7]">{selected ? `اختر مدينة أو بلدة من منطقة ${selected.name}` : "اختر منطقة من الخريطة لاستعراض المدن والبلدات التابعة لها"}</p></div>
-          <dl className="grid grid-cols-2 gap-x-7 gap-y-3 sm:grid-cols-4 lg:min-w-[530px]">
-            {[{ label: "المناطق", value: "10" }, { label: "المدن", value: "35" }, { label: "الملفات", value: "0" }, { label: "الشهادات", value: "0" }].map((stat) => <div key={stat.label} className="border-r border-[#9eaf9f]/25 pr-3"><dt className="text-[10px] text-[#95a89b]">{stat.label}</dt><dd className="mt-1 text-xl font-semibold tabular-nums text-[#e7d6ad]">{stat.value}</dd></div>)}
-          </dl>
+          <StatisticsStrip
+            tone="dark"
+            className="w-full sm:min-w-[530px] lg:w-auto"
+            items={[{ label: "المناطق", value: 10 }, { label: "المدن", value: 35 }, { label: "الملفات", value: 0 }, { label: "الشهادات", value: 0 }]}
+          />
         </div>
         <div className="mb-7 flex justify-start"><ContributionButtons /></div>
 
