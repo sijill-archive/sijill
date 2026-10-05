@@ -6,7 +6,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
-const contributionPath = (kind: "case" | "file") => kind === "case" ? "/cases/new" : "/workspace?add=file";
+const contributionPath = (kind: "case" | "file") => kind === "case" ? "/cases/new" : "/files/new";
 
 export function SiteMenu() {
   const [open, setOpen] = useState(false);

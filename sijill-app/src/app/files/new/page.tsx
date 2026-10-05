@@ -1,0 +1,77 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { GeographySelects } from "@/components/geography-selects";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+
+export default function NewFilePage() {
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
+  const [preview, setPreview] = useState<{ title: string; description: string; location: string } | null>(null);
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    if (!supabase) { router.replace("/account?mode=login&next=%2Ffiles%2Fnew"); return; }
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setReady(true);
+      else router.replace("/account?mode=login&next=%2Ffiles%2Fnew");
+    });
+  }, [router]);
+
+  const showPreview = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const cityChoice = String(values.get("city") ?? "");
+    const city = cityChoice === "__other__" ? String(values.get("cityOther") ?? "") : cityChoice;
+    const location = [values.get("governorate"), values.get("district"), city].map(String).filter(Boolean).join("، ");
+    setPreview({
+      title: String(values.get("title") ?? ""),
+      description: String(values.get("description") ?? ""),
+      location,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  if (!ready) return <main className="grid min-h-screen place-items-center bg-[#f8f7f2] text-sm text-stone-600 dark:bg-[#131916] dark:text-stone-400">جارٍ التحقق من الحساب...</main>;
+
+  return (
+    <main dir="rtl" className="min-h-screen bg-[#f8f7f2] px-5 py-12 text-[#1c2922] dark:bg-[#131916] dark:text-[#f1f1e9] sm:px-8">
+      <div className="mx-auto max-w-3xl">
+        <Link href="/workspace" className="text-sm text-[#527764] underline underline-offset-4">العودة إلى مساحة المساهم</Link>
+        <p className="mt-8 text-xs tracking-[.2em] text-[#98704b]">المشاركة في حفظ الذاكرة</p>
+        <h1 className="mt-3 text-3xl font-bold">إضافة ملف شخص</h1>
+        <p className="mt-3 text-sm leading-7 text-stone-600 dark:text-stone-400">يُستخدم الملف لتجميع المعلومات والشهادات المرتبطة بشخص، ويمكن ربطه بقضية عامة أو توثيقه بشكل مستقل.</p>
+
+        {preview && <div role="status" className="mt-5 rounded-xl border border-[#d2c29d] bg-[#f4efdf] px-4 py-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900"><p className="font-semibold">معاينة الملف: {preview.title}</p>{preview.location && <p className="mt-1">الموقع: {preview.location}</p>}{preview.description && <p className="mt-1 whitespace-pre-wrap">{preview.description}</p>}<p className="mt-2 text-xs text-stone-600 dark:text-stone-400">هذه معاينة فقط؛ لم تُحفظ البيانات أو تُرفع الملفات بعد. سنراجع شكل الملف ومعلوماته معاً قبل ربطه بقاعدة البيانات.</p></div>}
+
+        <form onSubmit={showPreview} className="mt-6 space-y-6 rounded-3xl border border-[#dfe2d9] bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-[#1a211d] sm:p-8">
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">معلومات الملف الأولية</h2>
+            <label className="block text-sm font-medium">عنوان الملف
+              <input required maxLength={180} name="title" placeholder="الاسم أو عنوان تعريفي للملف" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
+            </label>
+            <label className="block text-sm font-medium">معلومات أولية <span className="font-normal text-stone-500">(اختياري)</span>
+              <textarea maxLength={4000} name="description" rows={5} placeholder="اكتب معلومات تمهيدية ومصادرها إن وجدت. تبقى المعلومات قيد المراجعة." className="mt-2 w-full resize-y rounded-xl border border-stone-300 bg-white px-4 py-3 leading-7 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
+            </label>
+          </section>
+
+          <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
+            <div><h2 className="text-lg font-semibold">الموقع الجغرافي</h2><p className="mt-1 text-sm text-stone-500">اختياري؛ اتركه فارغاً إذا لم يكن معروفاً أو لا ينطبق على الملف.</p></div>
+            <GeographySelects idPrefix="file-location" />
+          </section>
+
+          <section className="rounded-xl border border-[#e4dfd2] bg-[#f7f5ee] p-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900">
+            <h2 className="font-semibold">تنبيه توثيقي</h2>
+            <p className="mt-1 text-stone-600 dark:text-stone-400">إنشاء الملف لا يعني ثبوت اتهام أو صدور حكم. ستُعرض المعلومات بعد اعتماد آلية التحقق والمراجعة، مع توضيح مصادرها ومستوى توثيقها.</p>
+          </section>
+
+          <button type="submit" className="w-full rounded-xl bg-[#194537] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#255c49] dark:bg-[#c0dec2] dark:text-[#13271f]">معاينة بيانات الملف</button>
+          <p className="text-center text-xs leading-6 text-stone-500">المعاينة لا تحفظ البيانات؛ نعمل الآن على مراجعة شكل الملف ومحتواه قبل تفعيل الإرسال.</p>
+        </form>
+      </div>
+    </main>
+  );
+}

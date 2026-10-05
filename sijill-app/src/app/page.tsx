@@ -9,6 +9,7 @@ import localityPoints from "@/data/syria-locality-points.json";
 import { ContributionButtons } from "@/components/site-menu";
 import { BrandLogo } from "@/components/brand-logo";
 import { StatisticsStrip } from "@/components/statistics-strip";
+import { geography } from "@/lib/geography";
 
 type Governorate = (typeof mapData.features)[number];
 
@@ -148,6 +149,7 @@ export default function Home() {
   const [selected, setSelected] = useState<Governorate | null>(null);
   const [query, setQuery] = useState("");
   const [governorate, setGovernorate] = useState("");
+  const [district, setDistrict] = useState("");
   const [city, setCity] = useState("");
   const [year, setYear] = useState("");
   useEffect(() => {
@@ -168,13 +170,16 @@ export default function Home() {
     const state = { ...(window.history.state ?? {}), sijillGovernorate: null };
     window.history.replaceState(state, "", `${window.location.pathname}${window.location.search}`);
   };
-  const regions = useMemo(() => [...mapData.features].map((feature) => feature.name).sort((a,b) => a.localeCompare(b, "ar")), []);
-  const availableCities = governorate ? places[governorate] ?? [] : [...new Set(Object.values(places).flat())].sort((a,b) => a.localeCompare(b, "ar"));
-  const mappedPlaceCount = Object.values(places).reduce((total, list) => total + list.length, 0);
+  const regions = useMemo(() => geography.governorates.map((item) => item.name), []);
+  const selectedGovernorate = geography.governorates.find((item) => item.name === governorate);
+  const availableDistricts = selectedGovernorate?.districts ?? geography.governorates.flatMap((item) => item.districts);
+  const selectedDistrict = availableDistricts.find((item) => item.id === district);
+  const availableCities = [...new Set((selectedDistrict ? selectedDistrict.places : selectedGovernorate ? selectedGovernorate.districts.flatMap((item) => item.places) : geography.governorates.flatMap((item) => item.districts.flatMap((districtItem) => districtItem.places))).map((place) => place.name))].sort((a,b) => a.localeCompare(b, "ar"));
+  const mappedPlaceCount = geography.governorates.reduce((total, item) => total + item.districts.reduce((subtotal, districtItem) => subtotal + districtItem.places.length, 0), 0);
   const mapStatistics = selected
     ? [
-        { label: "المناطق", value: selected.english === "Aleppo" ? "10" : "—" },
-        { label: "المدن والبلدات المدرجة", value: (places[selected.name] ?? []).length },
+        { label: "المناطق", value: geography.governorates.find((item) => item.name === selected.name)?.districts.length ?? "—" },
+        { label: "المدن والبلدات المدرجة", value: geography.governorates.find((item) => item.name === selected.name)?.districts.reduce((total, districtItem) => total + districtItem.places.length, 0) ?? 0 },
         { label: "الملفات", value: 0 },
         { label: "الشهادات", value: 0 },
       ]
@@ -230,9 +235,10 @@ export default function Home() {
       <section aria-labelledby="search-heading" className="border-y border-[#e1e2db] bg-[#f0f0e9] dark:border-stone-800 dark:bg-[#1a211d]">
         <div className="mx-auto max-w-7xl px-5 py-11 sm:px-8 lg:px-12">
           <p className="text-[10px] tracking-[.2em] text-[#98704b]">البحث في الأرشيف</p><h2 id="search-heading" className="mt-2 text-2xl font-semibold">ابحث عن ملف</h2>
-          <form action="/testimonies" method="get" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_.65fr_auto]">
+          <form action="/testimonies" method="get" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.1fr_.65fr_auto]">
             <label className="sr-only" htmlFor="q">البحث بالاسم</label><input id="q" name="q" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="اكتب الاسم أو كلمة من عنوان الملف" className="rounded-xl border border-[#d6dbd3] bg-white px-4 py-3 text-sm outline-none placeholder:text-stone-400 focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
-            <label className="sr-only" htmlFor="governorate">المحافظة</label><select id="governorate" name="governorate" value={governorate} onChange={(event) => { setGovernorate(event.target.value); setCity(""); }} className="rounded-xl border border-[#d6dbd3] bg-white px-4 py-3 text-sm text-stone-700 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815] dark:text-stone-200"><option value="">كل المحافظات</option>{regions.map((region) => <option key={region} value={region}>{region}</option>)}</select>
+            <label className="sr-only" htmlFor="governorate">المحافظة</label><select id="governorate" name="governorate" value={governorate} onChange={(event) => { setGovernorate(event.target.value); setDistrict(""); setCity(""); }} className="rounded-xl border border-[#d6dbd3] bg-white px-4 py-3 text-sm text-stone-700 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815] dark:text-stone-200"><option value="">كل المحافظات</option>{regions.map((region) => <option key={region} value={region}>{region}</option>)}</select>
+            <label className="sr-only" htmlFor="district">المنطقة الإدارية</label><select id="district" name="district" value={district} onChange={(event) => { setDistrict(event.target.value); setCity(""); }} className="rounded-xl border border-[#d6dbd3] bg-white px-4 py-3 text-sm text-stone-700 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815] dark:text-stone-200"><option value="">كل المناطق</option>{availableDistricts.map((item) => <option key={`${item.id}-${item.name}`} value={item.id}>{item.name}</option>)}</select>
             <label className="sr-only" htmlFor="city">المدينة أو المنطقة</label><select id="city" name="city" value={city} onChange={(event) => setCity(event.target.value)} className="rounded-xl border border-[#d6dbd3] bg-white px-4 py-3 text-sm text-stone-700 outline-none focus:border-[#527764] disabled:opacity-60 dark:border-stone-700 dark:bg-[#121815] dark:text-stone-200" disabled={availableCities.length === 0}><option value="">كل المدن والمناطق</option>{availableCities.map((name) => <option key={name} value={name}>{name}</option>)}</select>
             <label className="sr-only" htmlFor="year">السنة</label><select id="year" name="year" value={year} onChange={(event) => setYear(event.target.value)} className="rounded-xl border border-[#d6dbd3] bg-white px-4 py-3 text-sm text-stone-700 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815] dark:text-stone-200"><option value="">كل السنوات</option>{Array.from({ length: 77 }, (_, i) => 2026 - i).map((y) => <option key={y} value={y}>{y}</option>)}</select>
             <button type="submit" className="rounded-xl bg-[#194537] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#255c49]">بحث</button>

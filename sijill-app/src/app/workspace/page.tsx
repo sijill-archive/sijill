@@ -7,7 +7,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 const actions = [
   { title: "إضافة قضية", description: "إنشاء سجل لحدث عام وربط الملفات والشهادات به.", href: "/cases/new" },
-  { title: "إضافة ملف", description: "إنشاء ملف شخص وربطه بقضية أو توثيق مستقل." },
+  { title: "إضافة ملف", description: "إنشاء ملف شخص وربطه بقضية أو توثيق مستقل.", href: "/files/new" },
   { title: "شهاداتي", description: "مراجعة الشهادات التي أرسلتها أو ساهمت بها.", href: "/testimonies" },
   { title: "الصندوق الوارد", description: "رسائل الإدارة وإشعارات مراجعة المساهمات." },
   { title: "مخاطبة الإدارة", description: "إرسال طلب تعديل أو بلاغ أو استفسار." },

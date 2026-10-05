@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { GeographySelects } from "@/components/geography-selects";
+import { geography } from "@/lib/geography";
 
-const governorates = ["دمشق", "ريف دمشق", "حلب", "حمص", "حماة", "اللاذقية", "طرطوس", "إدلب", "دير الزور", "الرقة", "الحسكة", "درعا", "السويداء", "القنيطرة"];
 const eventTypes = ["قصف أو هجوم", "اعتقال أو اختفاء", "تهجير أو نزوح", "انتهاك", "حدث مدني", "أخرى"];
 
 export default function NewCasePage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
-  const [preview, setPreview] = useState<{ title: string; eventType: string; governorate: string; city: string } | null>(null);
+  const [preview, setPreview] = useState<{ title: string; eventType: string; governorate: string; district: string; city: string } | null>(null);
   const [approximateDate, setApproximateDate] = useState(false);
   const [links, setLinks] = useState([""]);
   const [files, setFiles] = useState<File[]>([]);
@@ -29,11 +30,16 @@ export default function NewCasePage() {
   const showPreview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
+    const governorateName = String(values.get("governorate") ?? "");
+    const districtId = String(values.get("district") ?? "");
+    const cityChoice = String(values.get("city") ?? "");
+    const district = geography.governorates.find((item) => item.name === governorateName)?.districts.find((item) => item.id === districtId);
     setPreview({
       title: String(values.get("title") ?? ""),
       eventType: String(values.get("eventType") ?? ""),
-      governorate: String(values.get("governorate") ?? ""),
-      city: String(values.get("city") ?? ""),
+      governorate: governorateName,
+      district: district?.name ?? "",
+      city: cityChoice === "__other__" ? String(values.get("cityOther") ?? "") : cityChoice,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -53,7 +59,7 @@ export default function NewCasePage() {
           <p className="mt-2 text-sm leading-7 text-stone-600 dark:text-stone-400">لا يوجد تصويت بنعم أو لا. نعرض عدد الشهادات ومصدرها ونوعها، ونراجعها قبل النشر؛ فالعدد وحده لا يحسم صحة القضية. تبقى الشهادات المتعارضة ظاهرة بعد المراجعة.</p>
         </section>
 
-        {preview && <div role="status" className="mt-5 rounded-xl border border-[#d2c29d] bg-[#f4efdf] px-4 py-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900"><p className="font-semibold">معاينة القضية: {preview.title}</p><p className="mt-1">النوع: {preview.eventType} · الموقع: {preview.governorate}، {preview.city}</p><p className="mt-1 text-xs text-stone-600 dark:text-stone-400">هذه معاينة فقط؛ لم تُحفظ البيانات أو تُرفع الملفات بعد. سنربط الإرسال والمراجعة بقاعدة البيانات في مرحلة لاحقة.</p></div>}
+        {preview && <div role="status" className="mt-5 rounded-xl border border-[#d2c29d] bg-[#f4efdf] px-4 py-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900"><p className="font-semibold">معاينة القضية: {preview.title}</p><p className="mt-1">النوع: {preview.eventType} · الموقع: {[preview.governorate, preview.district, preview.city].filter(Boolean).join("، ")}</p><p className="mt-1 text-xs text-stone-600 dark:text-stone-400">هذه معاينة فقط؛ لم تُحفظ البيانات أو تُرفع الملفات بعد. سنربط الإرسال والمراجعة بقاعدة البيانات في مرحلة لاحقة.</p></div>}
 
         <form onSubmit={showPreview} className="mt-6 space-y-6 rounded-3xl border border-[#dfe2d9] bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-[#1a211d] sm:p-8">
           <section className="space-y-4">
@@ -72,13 +78,8 @@ export default function NewCasePage() {
               <label className="block text-sm font-medium">الدولة
                 <input required name="country" defaultValue="سوريا" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
               </label>
-              <label className="block text-sm font-medium">المحافظة
-                <select required name="governorate" defaultValue="" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]"><option value="" disabled>اختر المحافظة</option>{governorates.map((name) => <option key={name}>{name}</option>)}</select>
-              </label>
             </div>
-            <label className="block text-sm font-medium">المدينة أو المنطقة
-              <input required maxLength={120} name="city" placeholder="مثال: حمص — بابا عمرو" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
-            </label>
+            <GeographySelects required idPrefix="case-location" />
             <label className="block text-sm font-medium">وصف أدق للموقع <span className="font-normal text-stone-500">(اختياري)</span>
               <input maxLength={240} name="locationDescription" placeholder="حيّ، شارع أو معلم قريب، دون نشر عنوان سكن خاص" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
             </label>

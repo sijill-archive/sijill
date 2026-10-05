@@ -1,6 +1,7 @@
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
+import { findPlaceLocations, geography } from "@/lib/geography";
 
 export const dynamic = "force-dynamic";
 
@@ -27,18 +28,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("ar", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
-type SearchParams = Promise<{ q?: string; city?: string; governorate?: string; year?: string }>;
-
-const cityGovernors: Record<string, string> = {
-  "حلب": "حلب", "عفرين": "حلب", "منبج": "حلب", "الباب": "حلب",
-  "الحسكة": "الحسكة", "القامشلي": "الحسكة", "رأس العين": "الحسكة", "المالكية": "الحسكة",
-  "الرقة": "الرقة", "تل أبيض": "الرقة", "السويداء": "السويداء", "شهبا": "السويداء",
-  "درعا": "درعا", "نوى": "درعا", "بصرى الشام": "درعا", "دير الزور": "دير الزور", "الميادين": "دير الزور", "البوكمال": "دير الزور",
-  "حماة": "حماة", "السلمية": "حماة", "مصياف": "حماة", "حمص": "حمص", "تدمر": "حمص", "الرستن": "حمص",
-  "إدلب": "إدلب", "معرة النعمان": "إدلب", "جسر الشغور": "إدلب", "اللاذقية": "اللاذقية", "جبلة": "اللاذقية", "القرداحة": "اللاذقية",
-  "القنيطرة": "القنيطرة", "خان أرنبة": "القنيطرة", "دوما": "ريف دمشق", "داريا": "ريف دمشق", "النبك": "ريف دمشق",
-  "طرطوس": "طرطوس", "بانياس": "طرطوس", "صافيتا": "طرطوس", "دمشق": "دمشق",
-};
+type SearchParams = Promise<{ q?: string; city?: string; district?: string; governorate?: string; year?: string }>;
 
 export default async function TestimoniesPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = await searchParams;
@@ -71,10 +61,12 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
       testimonies = rows.filter((item) => {
         const q = (filters.q ?? "").trim().toLocaleLowerCase("ar");
         const searchMatch = !q || `${item.title} ${item.description} ${item.city}`.toLocaleLowerCase("ar").includes(q);
-        const governorateMatch = !filters.governorate || cityGovernors[item.city] === filters.governorate || item.city === filters.governorate;
+        const locations = findPlaceLocations(item.city);
+        const governorateMatch = !filters.governorate || item.city === filters.governorate || locations.some(({ governorate }) => governorate.name === filters.governorate);
+        const districtMatch = !filters.district || item.city === geography.governorates.flatMap((governorate) => governorate.districts).find((district) => district.id === filters.district)?.name || locations.some(({ district }) => district.id === filters.district);
         const cityMatch = !filters.city || item.city === filters.city;
         const yearMatch = !filters.year || item.event_date?.startsWith(`${filters.year}-`);
-        return searchMatch && governorateMatch && cityMatch && yearMatch;
+        return searchMatch && governorateMatch && districtMatch && cityMatch && yearMatch;
       });
     }
   }
@@ -93,7 +85,7 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
         <h1 className="mt-4 text-3xl font-bold text-emerald-950 dark:text-stone-50 sm:text-4xl">الشهادات المنشورة</h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-600 dark:text-stone-400">تُعرض هنا الشهادات التي وافق أصحابها على نشرها واجتازت المراجعة. تبقى الشهادة توثيقًا للمعلومة ولا تصدر حكمًا قضائيًا.</p>
 
-        {(filters.q || filters.governorate || filters.city || filters.year) && <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-stone-600 dark:text-stone-400"><span>نتائج التصفية:</span>{filters.q && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.q}</span>}{filters.governorate && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.governorate}</span>}{filters.city && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.city}</span>}{filters.year && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.year}</span>}<Link href="/testimonies" className="mr-2 text-emerald-800 underline dark:text-emerald-300">مسح الفلاتر</Link></div>}
+        {(filters.q || filters.governorate || filters.district || filters.city || filters.year) && <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-stone-600 dark:text-stone-400"><span>نتائج التصفية:</span>{filters.q && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.q}</span>}{filters.governorate && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.governorate}</span>}{filters.district && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{geography.governorates.flatMap((governorate) => governorate.districts).find((district) => district.id === filters.district)?.name ?? filters.district}</span>}{filters.city && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.city}</span>}{filters.year && <span className="rounded-full bg-stone-100 px-3 py-1 dark:bg-stone-800">{filters.year}</span>}<Link href="/testimonies" className="mr-2 text-emerald-800 underline dark:text-emerald-300">مسح الفلاتر</Link></div>}
 
         {unavailable ? (
           <div role="status" className="mt-10 rounded-2xl border border-amber-300 bg-amber-50 p-6 text-sm leading-7 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
