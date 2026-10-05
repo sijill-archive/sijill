@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ mode?: string; next?: string }> }) {
   const { mode, next } = await searchParams;
-  const nextPath = next === "/cases/new" || next === "/workspace?add=file" ? next : "/workspace";
+  const nextPath = next === "/cases/new" || next === "/workspace?add=file" || next === "/admin" ? next : "/workspace";
   const accountMode = mode === "signup" || mode === "verified" || mode === "recovery" || mode === "update-password" ? mode : "login";
   return <AccountForm mode={accountMode} nextPath={nextPath} />;
 }

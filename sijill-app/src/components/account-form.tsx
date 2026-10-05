@@ -50,7 +50,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
       return () => { active = false; };
     }
     const savedPath = window.localStorage.getItem("sijill_after_auth");
-    const destination = savedPath === "/cases/new" || savedPath === "/workspace?add=file" ? savedPath : nextPath;
+    const destination = savedPath === "/cases/new" || savedPath === "/workspace?add=file" || savedPath === "/admin" ? savedPath : nextPath;
     let active = true;
     void supabase.auth.getSession().then(({ data }) => {
       if (active && data.session) {
@@ -114,7 +114,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
         const { error } = await supabase.auth.updateUser({ password: newPassword });
         if (error) throw error;
         const savedPath = window.localStorage.getItem("sijill_after_auth");
-        const destination = savedPath === "/cases/new" || savedPath === "/workspace?add=file" ? savedPath : nextPath;
+        const destination = savedPath === "/cases/new" || savedPath === "/workspace?add=file" || savedPath === "/admin" ? savedPath : nextPath;
         window.localStorage.removeItem("sijill_after_auth");
         router.replace(destination);
         return;

@@ -4,11 +4,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 const contributionPath = (kind: "case" | "file") => kind === "case" ? "/cases/new" : "/files/new";
 
 export function SiteMenu() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
   const [drawerWidth, setDrawerWidth] = useState(360);
@@ -29,6 +31,7 @@ export function SiteMenu() {
   }, []);
 
   const close = () => setOpen(false);
+  if (pathname.startsWith("/admin")) return null;
   return <>
     <Link href="/purpose" className="fixed left-5 top-[4.75rem] z-[52] rounded-full border border-[#d9ded5] bg-[#f8f7f2]/90 px-4 py-2 text-sm font-semibold text-[#234d3f] shadow-sm backdrop-blur transition hover:border-[#9bb39f] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#527764] dark:border-stone-700 dark:bg-[#171e1a]/90 dark:text-stone-200 dark:hover:bg-stone-800">
       غايتنا
