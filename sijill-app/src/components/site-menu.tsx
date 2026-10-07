@@ -33,9 +33,6 @@ export function SiteMenu() {
   const close = () => setOpen(false);
   if (pathname.startsWith("/admin")) return null;
   return <>
-    <Link href="/purpose" className="fixed left-5 top-[4.75rem] z-[52] rounded-full border border-[#d9ded5] bg-[#f8f7f2]/90 px-4 py-2 text-sm font-semibold text-[#234d3f] shadow-sm backdrop-blur transition hover:border-[#9bb39f] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#527764] dark:border-stone-700 dark:bg-[#171e1a]/90 dark:text-stone-200 dark:hover:bg-stone-800">
-      غايتنا
-    </Link>
     <motion.button type="button" aria-label={open ? "إغلاق القائمة" : "فتح القائمة"} aria-expanded={open} onClick={() => setOpen((value) => !value)} animate={{ x: open ? -(drawerWidth - 20) : 0 }} transition={{ type: "spring", damping: 28, stiffness: 260 }} className="fixed right-5 top-[4.75rem] z-[52] grid size-11 place-items-center rounded-full text-[#234d3f] transition-colors hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#527764] dark:text-stone-200 dark:hover:bg-white/10">
       <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ type: "spring", damping: 20, stiffness: 220 }} className="flex w-5 flex-col gap-1.5"><i className="h-px w-full bg-current"/><i className="h-px w-full bg-current"/><i className="h-px w-full bg-current"/></motion.span>
     </motion.button>
