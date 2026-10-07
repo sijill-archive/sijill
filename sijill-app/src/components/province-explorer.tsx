@@ -7,6 +7,8 @@ import { BrandLogo } from "@/components/brand-logo";
 import { ContributionButtons } from "@/components/site-menu";
 import { StatisticsStrip } from "@/components/statistics-strip";
 import mapData from "@/data/syria-district-explorers.json";
+import { useArchiveCounts } from "@/lib/use-archive-counts";
+import { CaseArchiveList } from "@/components/case-archive-list";
 
 type Province = (typeof mapData.governorates)[number];
 type District = Province["districts"][number];
@@ -20,6 +22,7 @@ function districtViewBox(district: District) {
 
 export function ProvinceExplorer({ slug }: { slug: string }) {
   const province = mapData.governorates.find((item) => item.slug === slug) as Province | undefined;
+  const archiveCounts = useArchiveCounts(province?.name);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoveredPlace, setHoveredPlace] = useState<string | null>(null);
@@ -79,7 +82,7 @@ export function ProvinceExplorer({ slug }: { slug: string }) {
 
         <div className="mb-8 flex flex-col gap-5 border-y border-white/10 py-5 lg:flex-row lg:items-end lg:justify-between">
           <div><p className="text-[10px] tracking-[.24em] text-[#c9a76b]">استكشف حسب المكان</p><h1 className="mt-2 text-3xl font-semibold sm:text-4xl">محافظة {province.name}</h1><p className="mt-2 text-xs leading-6 text-[#a5b3a7]">{selected ? `اختر مدينة أو بلدة من منطقة ${selected.name}` : "اختر منطقة من الخريطة لاستعراض المدن والبلدات التابعة لها"}</p></div>
-          <StatisticsStrip tone="dark" className="w-full sm:min-w-[530px] lg:w-auto" items={[{ label: "المناطق", value: province.districtCount }, { label: "المدن والبلدات", value: province.settlementCount }, { label: "الملفات", value: 0 }, { label: "الشهادات", value: 0 }]} />
+          <StatisticsStrip tone="dark" className="w-full sm:min-w-[300px] lg:w-auto" items={[{ label: "القضايا المنشورة", value: archiveCounts.cases }, { label: "الملفات المنشورة", value: archiveCounts.files }]} />
         </div>
 
         <div className="mb-7 flex justify-start"><ContributionButtons /></div>
@@ -131,6 +134,7 @@ export function ProvinceExplorer({ slug }: { slug: string }) {
           <span>{selected ? `${selected.places.length} مدينة وبلدة تظهر داخل المنطقة المحددة` : "الفواصل المضيئة تحدد حدود المناطق"}</span>
           <span>المصدر الإداري: OpenSyria؛ الحدود المرجعية: geoBoundaries، 2017</span>
         </div>
+        <CaseArchiveList governorate={province.name} />
       </section>
       <footer className="border-t border-white/10 px-5 py-6 text-center text-[10px] leading-6 text-[#7f9383]">تظهر المدن والبلدات عند توفر إحداثيات تقع ضمن المنطقة الإدارية. بعض الحدود مرجعية تاريخية وفق بيانات geoBoundaries لعام 2017.</footer>
     </main>

@@ -10,6 +10,8 @@ import { ContributionButtons } from "@/components/site-menu";
 import { BrandLogo } from "@/components/brand-logo";
 import { StatisticsStrip } from "@/components/statistics-strip";
 import { geography } from "@/lib/geography";
+import { useArchiveCounts } from "@/lib/use-archive-counts";
+import { CaseArchiveList } from "@/components/case-archive-list";
 
 type Governorate = (typeof mapData.features)[number];
 
@@ -152,6 +154,7 @@ export default function Home() {
   const [district, setDistrict] = useState("");
   const [city, setCity] = useState("");
   const [year, setYear] = useState("");
+  const archiveCounts = useArchiveCounts();
   useEffect(() => {
     const restoreMap = () => {
       const iso = window.history.state?.sijillGovernorate as string | undefined;
@@ -175,20 +178,10 @@ export default function Home() {
   const availableDistricts = selectedGovernorate?.districts ?? geography.governorates.flatMap((item) => item.districts);
   const selectedDistrict = availableDistricts.find((item) => item.id === district);
   const availableCities = [...new Set((selectedDistrict ? selectedDistrict.places : selectedGovernorate ? selectedGovernorate.districts.flatMap((item) => item.places) : geography.governorates.flatMap((item) => item.districts.flatMap((districtItem) => districtItem.places))).map((place) => place.name))].sort((a,b) => a.localeCompare(b, "ar"));
-  const mappedPlaceCount = geography.governorates.reduce((total, item) => total + item.districts.reduce((subtotal, districtItem) => subtotal + districtItem.places.length, 0), 0);
-  const mapStatistics = selected
-    ? [
-        { label: "المناطق", value: geography.governorates.find((item) => item.name === selected.name)?.districts.length ?? "—" },
-        { label: "المدن والبلدات المدرجة", value: geography.governorates.find((item) => item.name === selected.name)?.districts.reduce((total, districtItem) => total + districtItem.places.length, 0) ?? 0 },
-        { label: "الملفات", value: 0 },
-        { label: "الشهادات", value: 0 },
-      ]
-    : [
-        { label: "المحافظات", value: mapData.features.length },
-        { label: "المدن والبلدات المدرجة", value: mappedPlaceCount },
-        { label: "الملفات", value: 0 },
-        { label: "الشهادات", value: 0 },
-      ];
+  const mapStatistics = [
+    { label: "القضايا المنشورة", value: archiveCounts.cases },
+    { label: "الملفات المنشورة", value: archiveCounts.files },
+  ];
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#f8f7f2] text-[#1c2922] dark:bg-[#131916] dark:text-[#f1f1e9]">
@@ -228,8 +221,8 @@ export default function Home() {
       </section>
 
       <section aria-labelledby="featured-heading" className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-12">
-        <div className="flex items-end justify-between gap-5 border-b border-[#dfe2d9] pb-5 dark:border-stone-800"><div><p className="text-[10px] tracking-[.2em] text-[#98704b]">أرشيف سِجِلّ</p><h2 id="featured-heading" className="mt-2 text-2xl font-semibold">الملفات الأعلى توثيقاً</h2></div><span className="text-xs text-stone-500">أعلى ١٠ ملفات</span></div>
-        <div className="py-12 text-center"><span aria-hidden="true" className="mx-auto grid size-12 place-items-center rounded-full border border-[#d8ded4] text-xl text-[#537768] dark:border-stone-700">⌕</span><h3 className="mt-4 text-sm font-semibold">لا توجد ملفات منشورة بعد</h3><p className="mx-auto mt-2 max-w-md text-xs leading-6 text-stone-500 dark:text-stone-400">ستظهر الملفات بعد نشر سجلات الأرشيف ومراجعتها. سيُعرض مستوى التوثيق وعدد المواد المرتبطة بكل ملف دون إصدار أحكام.</p></div>
+        <div className="mb-4"><p className="text-[10px] tracking-[.2em] text-[#98704b]">أرشيف سِجِلّ</p><h2 id="featured-heading" className="mt-2 text-2xl font-semibold">القضايا والملفات المنشورة</h2><p className="mt-2 text-xs leading-6 text-stone-500 dark:text-stone-400">تظهر الملفات التابعة تحت القضية المرتبطة بها. المعلومات مواد توثيقية قيد القراءة ولا تمثل حكماً قضائياً.</p></div>
+        <CaseArchiveList />
       </section>
 
       <section aria-labelledby="search-heading" className="border-y border-[#e1e2db] bg-[#f0f0e9] dark:border-stone-800 dark:bg-[#1a211d]">

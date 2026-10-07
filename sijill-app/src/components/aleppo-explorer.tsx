@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import aleppoMap from "@/data/aleppo-explorer.json";
 import { ContributionButtons } from "@/components/site-menu";
 import { StatisticsStrip } from "@/components/statistics-strip";
+import { useArchiveCounts } from "@/lib/use-archive-counts";
 
 type District = (typeof aleppoMap.districts)[number];
 
@@ -31,6 +32,7 @@ function districtViewBox(district: District) {
 }
 
 export function AleppoExplorer() {
+  const archiveCounts = useArchiveCounts("حلب");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoveredPlace, setHoveredPlace] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export function AleppoExplorer() {
           <StatisticsStrip
             tone="dark"
             className="w-full sm:min-w-[530px] lg:w-auto"
-            items={[{ label: "المناطق", value: 10 }, { label: "المدن", value: 35 }, { label: "الملفات", value: 0 }, { label: "الشهادات", value: 0 }]}
+            items={[{ label: "القضايا المنشورة", value: archiveCounts.cases }, { label: "الملفات المنشورة", value: archiveCounts.files }]}
           />
         </div>
         <div className="mb-7 flex justify-start"><ContributionButtons /></div>

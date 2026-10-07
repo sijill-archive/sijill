@@ -19,7 +19,7 @@ export function StatisticsStrip({
   const valueColor = tone === "dark" ? "text-[#e7d6ad]" : "text-[#194537] dark:text-[#c0dec2]";
 
   return (
-    <dl className={`grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 ${className}`}>
+    <dl className={`grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 ${className}`}>
       {items.map((item) => (
         <div key={item.label} className={`rounded-2xl border px-4 py-3 text-right shadow-sm backdrop-blur-sm ${colors}`}>
           <dt className={`text-[10px] leading-5 ${secondary}`}>{item.label}</dt>
