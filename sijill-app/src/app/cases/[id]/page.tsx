@@ -26,7 +26,13 @@ export default function PublicCasePage() {
       if (!active) return;
       if (!data) { setMissing(true); setLoading(false); return; }
       setRecord(data as CaseRecord);
-      const result = await supabase.from("sijill_person_files").select("id,title,description,governorate,district_name,city").eq("case_id", id).eq("status", "published").order("title", { ascending: true });
+      const links = await supabase.from("sijill_case_person_files").select("person_file_id").eq("case_id", id);
+      const linkedIds = [...new Set([...(links.data ?? []).map((link) => link.person_file_id)])];
+      const legacy = await supabase.from("sijill_person_files").select("id").eq("case_id", id).eq("status", "published");
+      const fileIds = [...new Set([...linkedIds, ...(legacy.data ?? []).map((file) => file.id)])];
+      const result = fileIds.length
+        ? await supabase.from("sijill_person_files").select("id,title,description,governorate,district_name,city").in("id", fileIds).eq("status", "published").order("title", { ascending: true })
+        : { data: [] };
       if (active) { setFiles((result.data ?? []) as PersonFile[]); setLoading(false); }
     };
     void load();

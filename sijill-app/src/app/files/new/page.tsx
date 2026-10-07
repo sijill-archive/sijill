@@ -13,9 +13,9 @@ import { uploadArchiveMedia, validateArchiveMedia } from "@/lib/archive-media";
 export default function NewFilePage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
-  const [preview, setPreview] = useState<{ title: string; description: string; location: string; caseId: string; caseTitle: string } | null>(null);
+  const [preview, setPreview] = useState<{ title: string; description: string; location: string; caseIds: string[]; caseTitles: string[] } | null>(null);
   const [cases, setCases] = useState<{ id: string; title: string }[]>([]);
-  const [selectedCaseId, setSelectedCaseId] = useState("");
+  const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -29,7 +29,7 @@ export default function NewFilePage() {
         const result = await supabase.from("sijill_cases").select("id,title").eq("status", "published").order("title", { ascending: true }).limit(500);
         setCases(result.data ?? []);
         const selectedCase = new URLSearchParams(window.location.search).get("caseId");
-        if (selectedCase) setSelectedCaseId(selectedCase);
+        if (selectedCase) setSelectedCaseIds([selectedCase]);
       }
       else router.replace("/account?mode=login&next=%2Ffiles%2Fnew");
     });
@@ -43,8 +43,8 @@ export default function NewFilePage() {
     const governorate = String(values.get("governorate") ?? "");
     const districtId = String(values.get("district") ?? "");
     const district = geography.governorates.find((item) => item.name === governorate)?.districts.find((item) => item.id === districtId);
-    const caseId = String(values.get("caseId") ?? "");
-    const linkedCase = cases.find((item) => item.id === caseId);
+    const caseIds = values.getAll("caseIds").map(String);
+    const caseTitles = cases.filter((item) => caseIds.includes(item.id)).map((item) => item.title);
     const location = [governorate, district?.name, city].filter(Boolean).join("، ");
     setErrorMessage("");
     setMessage("");
@@ -52,8 +52,8 @@ export default function NewFilePage() {
       title: String(values.get("title") ?? ""),
       description: String(values.get("description") ?? ""),
       location,
-      caseId,
-      caseTitle: linkedCase?.title ?? "",
+      caseIds,
+      caseTitles,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -81,7 +81,7 @@ export default function NewFilePage() {
         created_by: user.id,
         title: preview.title.trim(),
         description: preview.description.trim(),
-        case_id: preview.caseId || null,
+        case_id: preview.caseIds[0] || null,
         country: governorate ? "سوريا" : null,
         governorate: governorate || null,
         district_id: district?.id ?? null,
@@ -92,6 +92,10 @@ export default function NewFilePage() {
       }).select("id").single();
       if (error) throw error;
       draftId = created.id;
+      if (preview.caseIds.length) {
+        const { error: linksError } = await supabase.from("sijill_case_person_files").insert(preview.caseIds.map((caseId) => ({ case_id: caseId, person_file_id: created.id })));
+        if (linksError) throw linksError;
+      }
       const media = await uploadArchiveMedia(supabase, "files", created.id, values);
       const { error: submitError } = await supabase.from("sijill_person_files").update({ media, status: "submitted" }).eq("id", created.id);
       if (submitError) {
@@ -101,7 +105,7 @@ export default function NewFilePage() {
       setMessage("أُرسل الملف إلى لوحة الإدارة للمراجعة. سيظهر للزوار بعد اعتماده ونشره.");
       setPreview(null);
       form.reset();
-      setSelectedCaseId("");
+      setSelectedCaseIds([]);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Failed to submit Sijill person file", error);
@@ -124,7 +128,7 @@ export default function NewFilePage() {
 
         {message && <div role="status" className="mt-5 rounded-xl border border-emerald-700/25 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-950/30 dark:text-emerald-100">{message}</div>}
         {errorMessage && <div role="alert" className="mt-5 rounded-xl border border-rose-700/25 bg-rose-50 px-4 py-4 text-sm leading-7 text-rose-900 dark:border-rose-400/20 dark:bg-rose-950/30 dark:text-rose-100">{errorMessage}</div>}
-        {preview && <div role="status" className="mt-5 rounded-xl border border-[#d2c29d] bg-[#f4efdf] px-4 py-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900"><p className="font-semibold">معاينة الملف: {preview.title}</p>{preview.caseTitle && <p className="mt-1">القضية المرتبطة: {preview.caseTitle}</p>}{preview.location && <p className="mt-1">الموقع: {preview.location}</p>}{preview.description && <p className="mt-1 whitespace-pre-wrap">{preview.description}</p>}<p className="mt-2 text-xs text-stone-600 dark:text-stone-400">بعد التأكيد يُرسل الملف إلى الإدارة؛ لا يظهر للعامة قبل اعتماده.</p><div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={() => void sendFile()} className="rounded-lg bg-[#194537] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "جارٍ الإرسال…" : "تأكيد الإرسال للمراجعة"}</button><button type="button" onClick={() => setPreview(null)} className="rounded-lg border border-stone-400 px-4 py-2 text-sm">العودة للتعديل</button></div></div>}
+        {preview && <div role="status" className="mt-5 rounded-xl border border-[#d2c29d] bg-[#f4efdf] px-4 py-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900"><p className="font-semibold">معاينة الملف: {preview.title}</p>{preview.caseTitles.length > 0 && <p className="mt-1">القضايا المرتبطة: {preview.caseTitles.join("، ")}</p>}{preview.location && <p className="mt-1">الموقع: {preview.location}</p>}{preview.description && <p className="mt-1 whitespace-pre-wrap">{preview.description}</p>}<p className="mt-2 text-xs text-stone-600 dark:text-stone-400">بعد التأكيد يُرسل الملف إلى الإدارة؛ لا يظهر للعامة قبل اعتماده.</p><div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={() => void sendFile()} className="rounded-lg bg-[#194537] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "جارٍ الإرسال…" : "تأكيد الإرسال للمراجعة"}</button><button type="button" onClick={() => setPreview(null)} className="rounded-lg border border-stone-400 px-4 py-2 text-sm">العودة للتعديل</button></div></div>}
 
         <form data-person-file-form onSubmit={showPreview} className="mt-6 space-y-6 rounded-3xl border border-[#dfe2d9] bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-[#1a211d] sm:p-8">
           <section className="space-y-4">
@@ -138,11 +142,8 @@ export default function NewFilePage() {
           </section>
 
           <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
-            <div><h2 className="text-lg font-semibold">ربط الملف بقضية</h2><p className="mt-1 text-sm text-stone-500">اختياري. اختر قضية منشورة ليظهر هذا الملف تحتها في الأرشيف.</p></div>
-            <label className="block text-sm font-medium">القضية المرتبطة
-              <select name="caseId" value={selectedCaseId} onChange={(event) => setSelectedCaseId(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]"><option value="">ملف مستقل دون قضية</option>{cases.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
-            </label>
-            {cases.length === 0 && <p className="text-xs text-stone-500">ستظهر هنا القضايا بعد اعتمادها ونشرها.</p>}
+            <div><h2 className="text-lg font-semibold">القضايا المرتبطة بالشخص</h2><p className="mt-1 text-sm text-stone-500">يمكن ربط ملف الشخص بأكثر من قضية منشورة، وسيظهر الملف تحت كل قضية.</p></div>
+            {cases.length === 0 ? <p className="text-xs text-stone-500">ستظهر هنا القضايا بعد اعتمادها ونشرها.</p> : <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-stone-300 p-3 dark:border-stone-700">{cases.map((item) => <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-stone-50 dark:hover:bg-stone-800"><input type="checkbox" name="caseIds" value={item.id} checked={selectedCaseIds.includes(item.id)} onChange={(event) => setSelectedCaseIds((current) => event.target.checked ? [...current, item.id] : current.filter((caseId) => caseId !== item.id))} className="size-4 accent-[#194537]" /><span>{item.title}</span></label>)}</div>}
           </section>
 
           <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
@@ -158,7 +159,7 @@ export default function NewFilePage() {
           </section>
 
           <button type="submit" className="w-full rounded-xl bg-[#194537] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#255c49] dark:bg-[#c0dec2] dark:text-[#13271f]">معاينة بيانات الملف</button>
-          <p className="text-center text-xs leading-6 text-stone-500">المعاينة لا تحفظ البيانات؛ نعمل الآن على مراجعة شكل الملف ومحتواه قبل تفعيل الإرسال.</p>
+          <p className="text-center text-xs leading-6 text-stone-500">المعاينة لا تحفظ البيانات؛ بعد التأكيد يُرسل الملف ومرفقاته إلى الإدارة للمراجعة.</p>
         </form>
       </div>
     </main>

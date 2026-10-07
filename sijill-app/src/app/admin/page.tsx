@@ -10,6 +10,7 @@ type Activity = { id: number; actor_id: string | null; record_type: string; reco
 type VerificationRequest = { id: string; subject_type: string; request_type: string; details: string; status: string; created_at: string };
 type CaseSubmission = { id: string; title: string; event_type: string; description: string; country: string; governorate: string; district_name: string; city: string; location_description: string | null; event_date: string | null; approximate_date: string | null; media: ArchiveMedia | null; created_at: string; status: string };
 type PersonFile = { id: string; title: string; description: string; case_id: string | null; governorate: string | null; district_name: string | null; city: string | null; media: ArchiveMedia | null; created_at: string; status: string };
+type FileCaseLink = { case_id: string; person_file_id: string };
 type DashboardData = {
   totals: { cases: number; files: number; testimonies: number; articles: number };
   pending: { cases: number; files: number; testimonies: number; requests: number };
@@ -19,6 +20,7 @@ type DashboardData = {
   pendingFiles: PersonFile[];
   cases: CaseSubmission[];
   files: PersonFile[];
+  fileLinks: FileCaseLink[];
 };
 
 const emptyData: DashboardData = {
@@ -30,6 +32,7 @@ const emptyData: DashboardData = {
   pendingFiles: [],
   cases: [],
   files: [],
+  fileLinks: [],
 };
 
 const actionLabels: Record<string, string> = { created: "إنشاء", updated: "تعديل", deleted: "حذف" };
@@ -60,7 +63,7 @@ export default function AdminDashboardPage() {
       const owner = roleRecord?.role === "owner";
       if (active) setIsOwner(owner);
 
-      const [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows] = await Promise.all([
+      const [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows, fileLinkRows] = await Promise.all([
         supabase.from("sijill_cases").select("id", { count: "exact", head: true }),
         supabase.from("sijill_person_files").select("id", { count: "exact", head: true }),
         supabase.from("sijill_testimonies").select("id", { count: "exact", head: true }),
@@ -75,10 +78,11 @@ export default function AdminDashboardPage() {
         supabase.from("sijill_person_files").select("id,title,description,case_id,governorate,district_name,city,media,created_at,status").eq("status", "submitted").order("title", { ascending: true }).limit(500),
         supabase.from("sijill_person_files").select("id,title,description,case_id,governorate,district_name,city,media,created_at,status").neq("status", "archived").order("title", { ascending: true }).limit(500),
         owner ? supabase.from("sijill_activity_log").select("id,actor_id,record_type,record_id,action,changed_fields,happened_at").order("happened_at", { ascending: false }).limit(8) : Promise.resolve({ data: [], error: null }),
+        supabase.from("sijill_case_person_files").select("case_id,person_file_id"),
       ]);
 
       if (!active) return;
-      const queryErrors = [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows].filter((result) => result.error);
+      const queryErrors = [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows, fileLinkRows].filter((result) => result.error);
       if (queryErrors.length) {
         const missingTable = queryErrors.some((result) => result.error?.code === "PGRST205" || result.error?.code === "42P01");
         setDatabaseMissing(missingTable);
@@ -94,6 +98,7 @@ export default function AdminDashboardPage() {
           pendingFiles: (fileRows.data ?? []) as PersonFile[],
           cases: (allCases.data ?? []) as CaseSubmission[],
           files: (allFiles.data ?? []) as PersonFile[],
+          fileLinks: (fileLinkRows.data ?? []) as FileCaseLink[],
           activity: (activityRows.data ?? []) as Activity[],
         });
       }
@@ -206,14 +211,14 @@ export default function AdminDashboardPage() {
         {isOwner && <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4"><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideSubmission("case", submission, "published")} className="rounded-lg bg-[#c0dec2] px-4 py-2 text-sm font-semibold text-[#14251d] disabled:opacity-50">{caseActionId === submission.id ? "جارٍ الحفظ…" : "اعتماد ونشر"}</button><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideSubmission("case", submission, "rejected")} className="rounded-lg border border-rose-400/30 px-4 py-2 text-sm text-rose-200 disabled:opacity-50">رفض</button></div>}
       </article>)}</div>}
       <div className="mt-7 border-t border-white/10 pt-5"><div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">الملفات المرسلة للمراجعة</h3><span className="text-xs text-amber-200">{loading ? "—" : data.pending.files} قيد المراجعة</span></div>
-        {loading ? <p className="mt-4 text-sm text-stone-500">جارٍ تحميل الملفات...</p> : data.pendingFiles.length === 0 ? <p className="mt-4 rounded-xl border border-white/8 bg-black/10 p-4 text-sm text-stone-400">لا توجد ملفات أشخاص تنتظر المراجعة.</p> : <div className="mt-4 space-y-3">{data.pendingFiles.map((submission) => <article key={submission.id} className="rounded-xl border border-white/10 bg-black/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-semibold">{submission.title}</h4><p className="mt-1 text-xs text-stone-400">{[submission.governorate, submission.district_name, submission.city].filter(Boolean).join("، ") || "دون موقع محدد"}</p>{submission.case_id && <p className="mt-1 text-xs text-[#e7d6ad]">مرتبط بقضية محفوظة</p>}</div><time className="text-[10px] text-stone-500">{dateFormatter.format(new Date(submission.created_at))}</time></div>{submission.description && <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-stone-300">{submission.description}</p>}<ArchiveMediaGallery media={submission.media} />{isOwner && <div className="mt-4 flex gap-2 border-t border-white/10 pt-4"><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideSubmission("file", submission, "published")} className="rounded-lg bg-[#c0dec2] px-4 py-2 text-sm font-semibold text-[#14251d] disabled:opacity-50">{caseActionId === submission.id ? "جارٍ الحفظ…" : "اعتماد ونشر"}</button><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideSubmission("file", submission, "rejected")} className="rounded-lg border border-rose-400/30 px-4 py-2 text-sm text-rose-200 disabled:opacity-50">رفض</button></div>}</article>)}</div>}
+        {loading ? <p className="mt-4 text-sm text-stone-500">جارٍ تحميل الملفات...</p> : data.pendingFiles.length === 0 ? <p className="mt-4 rounded-xl border border-white/8 bg-black/10 p-4 text-sm text-stone-400">لا توجد ملفات أشخاص تنتظر المراجعة.</p> : <div className="mt-4 space-y-3">{data.pendingFiles.map((submission) => <article key={submission.id} className="rounded-xl border border-white/10 bg-black/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-semibold">{submission.title}</h4><p className="mt-1 text-xs text-stone-400">{[submission.governorate, submission.district_name, submission.city].filter(Boolean).join("، ") || "دون موقع محدد"}</p>{fileCaseNames(submission, data.fileLinks, data.cases).length > 0 && <p className="mt-1 text-xs text-[#e7d6ad]">القضايا المرتبطة: {fileCaseNames(submission, data.fileLinks, data.cases).join("، ")}</p>}</div><time className="text-[10px] text-stone-500">{dateFormatter.format(new Date(submission.created_at))}</time></div>{submission.description && <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-stone-300">{submission.description}</p>}<ArchiveMediaGallery media={submission.media} />{isOwner && <div className="mt-4 flex gap-2 border-t border-white/10 pt-4"><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideSubmission("file", submission, "published")} className="rounded-lg bg-[#c0dec2] px-4 py-2 text-sm font-semibold text-[#14251d] disabled:opacity-50">{caseActionId === submission.id ? "جارٍ الحفظ…" : "اعتماد ونشر"}</button><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideSubmission("file", submission, "rejected")} className="rounded-lg border border-rose-400/30 px-4 py-2 text-sm text-rose-200 disabled:opacity-50">رفض</button></div>}</article>)}</div>}
       </div>
     </section>
 
     <section id="archive-management" className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs text-[#b69a6d]">فهرس الإدارة</p><h2 className="mt-2 text-xl font-semibold">القضايا والملفات</h2><p className="mt-1 text-xs leading-6 text-stone-500">مرتبة أبجدياً، ويمكن تصفيتها بالمحافظة. الملفات المرتبطة تشير إلى القضية التابعة لها.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setArchiveKind("cases")} className={`rounded-lg px-3 py-2 text-sm ${archiveKind === "cases" ? "bg-[#c0dec2] text-[#14251d]" : "border border-white/15 text-stone-300"}`}>القضايا ({data.cases.length})</button><button type="button" onClick={() => setArchiveKind("files")} className={`rounded-lg px-3 py-2 text-sm ${archiveKind === "files" ? "bg-[#c0dec2] text-[#14251d]" : "border border-white/15 text-stone-300"}`}>الملفات ({data.files.length})</button></div></div>
       <div className="mt-4"><label className="text-xs text-stone-400">تصفية حسب المحافظة<select value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)} className="mt-2 block w-full rounded-lg border border-white/15 bg-[#101713] px-3 py-2 text-sm text-stone-200 sm:max-w-sm"><option value="">كل المحافظات</option>{regions.map((region) => <option key={region} value={region}>{region}</option>)}</select></label></div>
-      {loading ? <p className="mt-5 text-sm text-stone-500">جارٍ تحميل الفهرس...</p> : archiveKind === "cases" ? visibleCases.length === 0 ? <p className="mt-5 text-sm text-stone-500">لا توجد قضايا ضمن هذا الاختيار.</p> : <div className="mt-5 space-y-3">{visibleCases.map((item) => { const children = data.files.filter((file) => file.case_id === item.id).sort((a, b) => a.title.localeCompare(b.title, "ar")); return <article key={item.id} className="rounded-xl border border-white/10 bg-black/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{item.title}</h3><p className="mt-1 text-xs text-stone-400">{item.event_type} · {[item.governorate, item.district_name, item.city].filter(Boolean).join("، ")}</p><p className="mt-1 text-xs text-stone-500">الحالة: {statusLabel(item.status)} · {children.length} ملف مرتبط</p></div>{item.status === "published" && <Link href={`/files/new?caseId=${item.id}`} className="rounded-lg border border-[#c0dec2]/30 px-3 py-2 text-xs text-[#c0dec2]">＋ إضافة ملف مرتبط</Link>}</div>{children.length > 0 && <ul className="mr-3 mt-3 space-y-1 border-r border-white/15 pr-3">{children.map((file) => <li key={file.id} className="text-sm text-stone-300">📁 {file.title} <span className="text-xs text-stone-500">· {statusLabel(file.status)}</span></li>)}</ul>}</article>; })}</div> : visibleFiles.length === 0 ? <p className="mt-5 text-sm text-stone-500">لا توجد ملفات ضمن هذا الاختيار.</p> : <div className="mt-5 grid gap-3 sm:grid-cols-2">{visibleFiles.map((item) => <article key={item.id} className="rounded-xl border border-white/10 bg-black/10 p-4"><h3 className="font-semibold">{item.title}</h3><p className="mt-1 text-xs text-stone-400">{[item.governorate, item.district_name, item.city].filter(Boolean).join("، ") || "دون موقع محدد"}</p><p className="mt-1 text-xs text-stone-500">الحالة: {statusLabel(item.status)}{item.case_id ? " · مرتبط بقضية" : " · مستقل"}</p>{item.status === "published" && item.case_id && <Link href={`/cases/${item.case_id}`} className="mt-3 inline-block text-xs text-[#c0dec2] underline underline-offset-4">فتح القضية المرتبطة</Link>}</article>)}</div>}
+      {loading ? <p className="mt-5 text-sm text-stone-500">جارٍ تحميل الفهرس...</p> : archiveKind === "cases" ? visibleCases.length === 0 ? <p className="mt-5 text-sm text-stone-500">لا توجد قضايا ضمن هذا الاختيار.</p> : <div className="mt-5 space-y-3">{visibleCases.map((item) => { const children = data.files.filter((file) => fileHasCase(file, item.id, data.fileLinks)).sort((a, b) => a.title.localeCompare(b.title, "ar")); return <article key={item.id} className="rounded-xl border border-white/10 bg-black/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{item.title}</h3><p className="mt-1 text-xs text-stone-400">{item.event_type} · {[item.governorate, item.district_name, item.city].filter(Boolean).join("، ")}</p><p className="mt-1 text-xs text-stone-500">الحالة: {statusLabel(item.status)} · {children.length} ملف مرتبط</p></div>{item.status === "published" && <Link href={`/files/new?caseId=${item.id}`} className="rounded-lg border border-[#c0dec2]/30 px-3 py-2 text-xs text-[#c0dec2]">＋ إضافة ملف مرتبط</Link>}</div>{children.length > 0 && <ul className="mr-3 mt-3 space-y-1 border-r border-white/15 pr-3">{children.map((file) => <li key={file.id} className="text-sm text-stone-300">📁 {file.title} <span className="text-xs text-stone-500">· {statusLabel(file.status)}</span></li>)}</ul>}</article>; })}</div> : visibleFiles.length === 0 ? <p className="mt-5 text-sm text-stone-500">لا توجد ملفات ضمن هذا الاختيار.</p> : <div className="mt-5 grid gap-3 sm:grid-cols-2">{visibleFiles.map((item) => <article key={item.id} className="rounded-xl border border-white/10 bg-black/10 p-4"><h3 className="font-semibold">{item.title}</h3><p className="mt-1 text-xs text-stone-400">{[item.governorate, item.district_name, item.city].filter(Boolean).join("، ") || "دون موقع محدد"}</p><p className="mt-1 text-xs text-stone-500">الحالة: {statusLabel(item.status)}{fileCaseNames(item, data.fileLinks, data.cases).length ? ` · مرتبط بـ ${fileCaseNames(item, data.fileLinks, data.cases).length} قضايا` : " · مستقل"}</p>{item.status === "published" && item.case_id && <Link href={`/cases/${item.case_id}`} className="mt-3 inline-block text-xs text-[#c0dec2] underline underline-offset-4">فتح القضية المرتبطة</Link>}</article>)}</div>}
     </section>
 
     {isOwner && <section id="activity" className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6">
@@ -231,4 +236,13 @@ function ModuleCard({ title, description, state }: { title: string; description:
 
 function statusLabel(status: string) {
   return ({ submitted: "قيد المراجعة", published: "منشور", rejected: "مرفوض", draft: "مسودة" } as Record<string, string>)[status] ?? status;
+}
+
+function fileHasCase(file: PersonFile, caseId: string, links: FileCaseLink[]) {
+  return file.case_id === caseId || links.some((link) => link.person_file_id === file.id && link.case_id === caseId);
+}
+
+function fileCaseNames(file: PersonFile, links: FileCaseLink[], cases: CaseSubmission[]) {
+  const ids = new Set([...(file.case_id ? [file.case_id] : []), ...links.filter((link) => link.person_file_id === file.id).map((link) => link.case_id)]);
+  return [...ids].map((id) => cases.find((item) => item.id === id)?.title).filter((title): title is string => Boolean(title));
 }
