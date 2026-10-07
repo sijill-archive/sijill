@@ -28,6 +28,31 @@
   background: radial-gradient(ellipse, rgba(30, 54, 43, .32) 0%, rgba(38, 67, 52, .12) 48%, transparent 75%);
 }
 
+.archive-frame {
+  --archive-frame-fill: #17211c;
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(135deg, #c3a96b 0%, #766747 38%, #b69a62 72%, #796747 100%);
+  clip-path: polygon(22px 0, calc(100% - 22px) 0, 100% 22px, 100% calc(100% - 22px), calc(100% - 22px) 100%, 22px 100%, 0 calc(100% - 22px), 0 22px);
+}
+
+.archive-frame::before {
+  position: absolute;
+  z-index: -1;
+  inset: 1px;
+  content: "";
+  background: var(--archive-frame-fill);
+  clip-path: polygon(21px 0, calc(100% - 21px) 0, 100% 21px, 100% calc(100% - 21px), calc(100% - 21px) 100%, 21px 100%, 0 calc(100% - 21px), 0 21px);
+}
+
+.archive-frame--file {
+  background: linear-gradient(135deg, #a9925d 0%, #625840 50%, #988251 100%);
+}
+
+.archive-frame--nested {
+  --archive-frame-fill: #141a16;
+}
+
 @media (prefers-color-scheme: dark) {
   .map-aura {
     background: radial-gradient(circle, rgba(62, 115, 88, .28) 0%, rgba(58, 94, 72, .13) 42%, rgba(19, 25, 22, 0) 74%);
