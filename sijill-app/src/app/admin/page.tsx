@@ -6,11 +6,13 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type Activity = { id: number; actor_id: string | null; record_type: string; record_id: string; action: string; changed_fields: string[]; happened_at: string };
 type VerificationRequest = { id: string; subject_type: string; request_type: string; details: string; status: string; created_at: string };
+type CaseSubmission = { id: string; title: string; event_type: string; description: string; country: string; governorate: string; district_name: string; city: string; location_description: string | null; event_date: string | null; approximate_date: string | null; created_at: string };
 type DashboardData = {
   totals: { cases: number; files: number; testimonies: number; articles: number };
   pending: { cases: number; files: number; testimonies: number; requests: number };
   activity: Activity[];
   requests: VerificationRequest[];
+  pendingCases: CaseSubmission[];
 };
 
 const emptyData: DashboardData = {
@@ -18,6 +20,7 @@ const emptyData: DashboardData = {
   pending: { cases: 0, files: 0, testimonies: 0, requests: 0 },
   activity: [],
   requests: [],
+  pendingCases: [],
 };
 
 const actionLabels: Record<string, string> = { created: "إنشاء", updated: "تعديل", deleted: "حذف" };
@@ -31,6 +34,7 @@ export default function AdminDashboardPage() {
   const [databaseMissing, setDatabaseMissing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [caseActionId, setCaseActionId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -45,7 +49,7 @@ export default function AdminDashboardPage() {
       const owner = roleRecord?.role === "owner";
       if (active) setIsOwner(owner);
 
-      const [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, activityRows] = await Promise.all([
+      const [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, activityRows] = await Promise.all([
         supabase.from("sijill_cases").select("id", { count: "exact", head: true }),
         supabase.from("sijill_person_files").select("id", { count: "exact", head: true }),
         supabase.from("sijill_testimonies").select("id", { count: "exact", head: true }),
@@ -55,11 +59,12 @@ export default function AdminDashboardPage() {
         supabase.from("sijill_testimonies").select("id", { count: "exact", head: true }).eq("status", "submitted"),
         supabase.from("sijill_verification_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("sijill_verification_requests").select("id,subject_type,request_type,details,status,created_at").eq("status", "pending").order("created_at", { ascending: false }).limit(5),
+        supabase.from("sijill_cases").select("id,title,event_type,description,country,governorate,district_name,city,location_description,event_date,approximate_date,created_at").eq("status", "submitted").order("created_at", { ascending: false }).limit(20),
         owner ? supabase.from("sijill_activity_log").select("id,actor_id,record_type,record_id,action,changed_fields,happened_at").order("happened_at", { ascending: false }).limit(8) : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (!active) return;
-      const queryErrors = [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, activityRows].filter((result) => result.error);
+      const queryErrors = [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, activityRows].filter((result) => result.error);
       if (queryErrors.length) {
         const missingTable = queryErrors.some((result) => result.error?.code === "PGRST205" || result.error?.code === "42P01");
         setDatabaseMissing(missingTable);
@@ -71,6 +76,7 @@ export default function AdminDashboardPage() {
           totals: { cases: caseTotal.count ?? 0, files: fileTotal.count ?? 0, testimonies: testimonyTotal.count ?? 0, articles: articleTotal.count ?? 0 },
           pending: { cases: casePending.count ?? 0, files: filePending.count ?? 0, testimonies: testimonyPending.count ?? 0, requests: requestPending.count ?? 0 },
           requests: (requestRows.data ?? []) as VerificationRequest[],
+          pendingCases: (caseRows.data ?? []) as CaseSubmission[],
           activity: (activityRows.data ?? []) as Activity[],
         });
       }
@@ -80,6 +86,35 @@ export default function AdminDashboardPage() {
     void loadDashboard();
     return () => { active = false; };
   }, []);
+
+  const decideCase = async (submission: CaseSubmission, decision: "published" | "rejected") => {
+    if (!isOwner || caseActionId) return;
+    const actionLabel = decision === "published" ? "نشر هذه القضية للزوار" : "رفض هذه القضية";
+    if (!window.confirm(`هل تريد ${actionLabel}؟`)) return;
+    const supabase = createBrowserSupabaseClient();
+    if (!supabase) return;
+    setCaseActionId(submission.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoadError(true);
+      setCaseActionId(null);
+      return;
+    }
+    const update = decision === "published"
+      ? { status: "published", published_at: new Date().toISOString(), published_by: user.id }
+      : { status: "rejected" };
+    const { data: updated, error } = await supabase.from("sijill_cases").update(update).eq("id", submission.id).eq("status", "submitted").select("id").maybeSingle();
+    if (error || !updated) {
+      setLoadError(true);
+    } else {
+      setData((current) => ({
+        ...current,
+        pending: { ...current.pending, cases: Math.max(0, current.pending.cases - 1) },
+        pendingCases: current.pendingCases.filter((item) => item.id !== submission.id),
+      }));
+    }
+    setCaseActionId(null);
+  };
 
   const total = Object.values(data.totals).reduce((sum, value) => sum + value, 0);
   const pendingSubmissions = data.pending.cases + data.pending.files + data.pending.testimonies;
@@ -134,6 +169,18 @@ export default function AdminDashboardPage() {
         <div className="mt-5 rounded-xl border border-[#a58c62]/20 bg-[#8e7448]/10 p-4 text-xs leading-6 text-stone-300"><strong className="text-[#e1c995]">مراجعة الذكاء الاصطناعي غير مفعّلة بعد.</strong> لذلك لم يُضف زر نشر للمحررين؛ قاعدة البيانات لن تسمح بنشر محتواهم قبل ربط المراجعة فعلياً.</div>
       </section>
     </div>
+
+    <section id="case-review" className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><p className="text-xs text-[#b69a6d]">مراجعة المالك</p><h2 className="mt-2 text-xl font-semibold">القضايا المرسلة للمراجعة</h2><p className="mt-1 text-xs leading-6 text-stone-500">تظهر هنا القضايا المحفوظة بحالة «قيد المراجعة». نشر القضية يجعلها متاحة للزوار.</p></div>
+        <span className="rounded-full bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">{loading ? "—" : data.pending.cases} قيد المراجعة</span>
+      </div>
+      {loading ? <p className="mt-5 text-sm text-stone-500">جارٍ تحميل القضايا...</p> : data.pendingCases.length === 0 ? <p className="mt-5 rounded-xl border border-white/8 bg-black/10 p-4 text-sm text-stone-400">لا توجد قضايا جديدة للمراجعة. ستظهر القضية بعد إرسالها من نموذج الإضافة.</p> : <div className="mt-5 space-y-4">{data.pendingCases.map((submission) => <article key={submission.id} className="rounded-xl border border-white/10 bg-black/10 p-4 sm:p-5">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><h3 className="text-lg font-semibold">{submission.title}</h3><p className="mt-1 text-xs text-stone-400">{submission.event_type} · {[submission.country, submission.governorate, submission.district_name, submission.city].filter(Boolean).join("، ")}</p><p className="mt-1 text-xs text-stone-500">{submission.event_date ? dateFormatter.format(new Date(`${submission.event_date}T00:00:00`)) : submission.approximate_date || "التاريخ غير محدد"}{submission.location_description ? ` · ${submission.location_description}` : ""}</p></div><time className="shrink-0 text-[10px] text-stone-500" dateTime={submission.created_at}>{dateFormatter.format(new Date(submission.created_at))}</time></div>
+        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-300">{submission.description}</p>
+        {isOwner && <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4"><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideCase(submission, "published")} className="rounded-lg bg-[#c0dec2] px-4 py-2 text-sm font-semibold text-[#14251d] disabled:opacity-50">{caseActionId === submission.id ? "جارٍ الحفظ…" : "اعتماد ونشر"}</button><button type="button" disabled={caseActionId === submission.id} onClick={() => void decideCase(submission, "rejected")} className="rounded-lg border border-rose-400/30 px-4 py-2 text-sm text-rose-200 disabled:opacity-50">رفض</button></div>}
+      </article>)}</div>}
+    </section>
 
     {isOwner && <section id="activity" className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3"><div><p className="text-xs text-[#b69a6d]">للمالك فقط</p><h2 className="mt-2 text-xl font-semibold">سجل الحركات</h2><p className="mt-1 text-xs text-stone-500">يسجل نوع العملية والحقول التي تغيرت، ولا ينسخ نصوص الشهادات أو الأدلة إلى سجل النشاط.</p></div><span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] text-stone-400">سجل غير قابل للتحرير من الواجهة</span></div>

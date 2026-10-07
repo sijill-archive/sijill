@@ -13,10 +13,11 @@ const eventTypes = ["قصف أو هجوم", "اعتقال أو اختفاء", "�
 export default function NewCasePage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
-  const [preview, setPreview] = useState<{ title: string; eventType: string; governorate: string; district: string; city: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [approximateDate, setApproximateDate] = useState(false);
-  const [links, setLinks] = useState([""]);
-  const [files, setFiles] = useState<File[]>([]);
+  const [formResetKey, setFormResetKey] = useState(0);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -27,21 +28,75 @@ export default function NewCasePage() {
     });
   }, [router]);
 
-  const showPreview = (event: FormEvent<HTMLFormElement>) => {
+  const submitCase = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const form = event.currentTarget;
+    setMessage("");
+    setErrorMessage("");
     const values = new FormData(event.currentTarget);
     const governorateName = String(values.get("governorate") ?? "");
     const districtId = String(values.get("district") ?? "");
     const cityChoice = String(values.get("city") ?? "");
     const district = geography.governorates.find((item) => item.name === governorateName)?.districts.find((item) => item.id === districtId);
-    setPreview({
-      title: String(values.get("title") ?? ""),
-      eventType: String(values.get("eventType") ?? ""),
-      governorate: governorateName,
-      district: district?.name ?? "",
-      city: cityChoice === "__other__" ? String(values.get("cityOther") ?? "") : cityChoice,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const city = cityChoice === "__other__" ? String(values.get("cityOther") ?? "").trim() : cityChoice;
+    const title = String(values.get("title") ?? "").trim();
+    const eventDescription = String(values.get("description") ?? "").trim();
+    const firsthand = String(values.get("firsthand") ?? "").trim();
+    const secondhand = String(values.get("secondhand") ?? "").trim();
+    const description = [
+      eventDescription,
+      firsthand ? `\n\nما عاينه مقدم القضية:\n${firsthand}` : "",
+      secondhand ? `\n\nمعلومات منقولة أو مصادر منشورة:\n${secondhand}` : "",
+    ].filter(Boolean).join("");
+
+    if (title.length < 3 || !district || !city || eventDescription.length < 30) {
+      setErrorMessage("أكمل عنوان القضية والموقع والوصف (30 حرفاً على الأقل) قبل الإرسال.");
+      return;
+    }
+
+    const supabase = createBrowserSupabaseClient();
+    if (!supabase) {
+      setErrorMessage("تعذر الاتصال بقاعدة البيانات. أعد تحميل الصفحة وحاول مرة أخرى.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        router.replace("/account?mode=login&next=%2Fcases%2Fnew");
+        return;
+      }
+
+      const eventDate = String(values.get("eventDate") ?? "");
+      const { error } = await supabase.from("sijill_cases").insert({
+        created_by: user.id,
+        title,
+        event_type: String(values.get("eventType") ?? "أخرى"),
+        description,
+        country: String(values.get("country") ?? "سوريا").trim() || "سوريا",
+        governorate: governorateName,
+        district_id: district.id,
+        district_name: district.name,
+        city,
+        location_description: String(values.get("locationDescription") ?? "").trim() || null,
+        event_date: eventDate || null,
+        approximate_date: approximateDate ? String(values.get("approximateDate") ?? "").trim() || null : null,
+        status: "submitted",
+      });
+      if (error) throw error;
+
+      form.reset();
+      setApproximateDate(false);
+      setFormResetKey((key) => key + 1);
+      setMessage("أُرسلت القضية بنجاح إلى لوحة الإدارة للمراجعة. لن تظهر للعامة حتى يعتمدها المالك.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      console.error("Failed to submit Sijill case", error);
+      setErrorMessage("لم تُحفظ القضية. تحقق من اتصال الإنترنت وحاول مرة أخرى؛ إذا تكررت المشكلة أرسل لنا لقطة للخطأ.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!ready) return <main className="grid min-h-screen place-items-center bg-[#f8f7f2] text-sm text-stone-600 dark:bg-[#131916] dark:text-stone-400">جارٍ التحقق من الحساب...</main>;
@@ -59,9 +114,10 @@ export default function NewCasePage() {
           <p className="mt-2 text-sm leading-7 text-stone-600 dark:text-stone-400">لا يوجد تصويت بنعم أو لا. نعرض عدد الشهادات ومصدرها ونوعها، ونراجعها قبل النشر؛ فالعدد وحده لا يحسم صحة القضية. تبقى الشهادات المتعارضة ظاهرة بعد المراجعة.</p>
         </section>
 
-        {preview && <div role="status" className="mt-5 rounded-xl border border-[#d2c29d] bg-[#f4efdf] px-4 py-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900"><p className="font-semibold">معاينة القضية: {preview.title}</p><p className="mt-1">النوع: {preview.eventType} · الموقع: {[preview.governorate, preview.district, preview.city].filter(Boolean).join("، ")}</p><p className="mt-1 text-xs text-stone-600 dark:text-stone-400">هذه معاينة فقط؛ لم تُحفظ البيانات أو تُرفع الملفات بعد. سنربط الإرسال والمراجعة بقاعدة البيانات في مرحلة لاحقة.</p></div>}
+        {message && <div role="status" className="mt-5 rounded-xl border border-emerald-700/25 bg-emerald-50 px-4 py-4 text-sm leading-7 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-950/30 dark:text-emerald-100">{message}</div>}
+        {errorMessage && <div role="alert" className="mt-5 rounded-xl border border-rose-700/25 bg-rose-50 px-4 py-4 text-sm leading-7 text-rose-900 dark:border-rose-400/20 dark:bg-rose-950/30 dark:text-rose-100">{errorMessage}</div>}
 
-        <form onSubmit={showPreview} className="mt-6 space-y-6 rounded-3xl border border-[#dfe2d9] bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-[#1a211d] sm:p-8">
+        <form onSubmit={submitCase} className="mt-6 space-y-6 rounded-3xl border border-[#dfe2d9] bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-[#1a211d] sm:p-8">
           <section className="space-y-4">
             <h2 className="text-lg font-semibold">تعريف الحدث</h2>
             <label className="block text-sm font-medium">عنوان القضية
@@ -79,7 +135,7 @@ export default function NewCasePage() {
                 <input required name="country" defaultValue="سوريا" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
               </label>
             </div>
-            <GeographySelects required idPrefix="case-location" />
+            <GeographySelects key={formResetKey} required idPrefix="case-location" />
             <label className="block text-sm font-medium">وصف أدق للموقع <span className="font-normal text-stone-500">(اختياري)</span>
               <input maxLength={240} name="locationDescription" placeholder="حيّ، شارع أو معلم قريب، دون نشر عنوان سكن خاص" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
             </label>
@@ -109,18 +165,7 @@ export default function NewCasePage() {
 
           <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
             <h2 className="text-lg font-semibold">مواد ومصادر داعمة</h2>
-            <label className="block text-sm font-medium">صور أو وثائق
-              <input type="file" multiple accept="image/*,.pdf,.doc,.docx" onChange={(event) => setFiles((current) => [...current.filter((file) => !file.type.startsWith("image/")), ...Array.from(event.target.files ?? [])])} className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-3 py-3 text-sm file:ml-3 file:rounded-lg file:border-0 file:bg-[#e9efe9] file:px-3 file:py-2 file:text-[#194537] dark:border-stone-700 dark:bg-[#121815] dark:file:bg-stone-800 dark:file:text-[#c0dec2]" />
-            </label>
-            <label className="block text-sm font-medium">فيديوهات
-              <input type="file" multiple accept="video/*" onChange={(event) => setFiles((current) => [...current.filter((file) => !file.type.startsWith("video/")), ...Array.from(event.target.files ?? [])])} className="mt-2 block w-full rounded-xl border border-stone-300 bg-white px-3 py-3 text-sm file:ml-3 file:rounded-lg file:border-0 file:bg-[#e9efe9] file:px-3 file:py-2 file:text-[#194537] dark:border-stone-700 dark:bg-[#121815] dark:file:bg-stone-800 dark:file:text-[#c0dec2]" />
-            </label>
-            {files.length > 0 && <p className="text-xs leading-6 text-stone-500">الملفات المحددة: {files.map((file) => file.name).join("، ")}</p>}
-            <div className="space-y-3">
-              <p className="text-sm font-medium">روابط YouTube</p>
-              {links.map((url, index) => <div key={index} className="flex gap-2"><input type="url" value={url} onChange={(event) => setLinks((current) => current.map((item, i) => i === index ? event.target.value : item))} placeholder="https://www.youtube.com/..." dir="ltr" className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-left text-sm outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />{links.length > 1 && <button type="button" onClick={() => setLinks((current) => current.filter((_, i) => i !== index))} className="px-3 text-xs text-rose-700 dark:text-rose-300">حذف</button>}</div>)}
-              <button type="button" onClick={() => setLinks((current) => [...current, ""])} className="text-sm font-semibold text-[#527764] underline underline-offset-4">＋ إضافة رابط آخر</button>
-            </div>
+            <p className="rounded-xl bg-stone-50 p-4 text-sm leading-7 text-stone-600 dark:bg-stone-900 dark:text-stone-400">رفع الصور والوثائق والفيديوهات وروابط YouTube سيُفعّل بعد إعداد التخزين الآمن. لا ترفق معلومات حساسة هنا الآن؛ أرسل بيانات القضية النصية فقط.</p>
           </section>
 
           <section className="rounded-xl border border-[#e4dfd2] bg-[#f7f5ee] p-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900">
@@ -128,8 +173,8 @@ export default function NewCasePage() {
             <p className="mt-1 text-stone-600 dark:text-stone-400">تُرسل القضية للمراجعة قبل النشر. بعد قبولها يمكن للناس إضافة شهاداتهم، مع تمييز الشاهد المباشر عن المصدر المنقول. لا يُستخدم تصويت شعبي لإثبات التهمة أو نفيها.</p>
           </section>
 
-          <button type="submit" className="w-full rounded-xl bg-[#194537] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#255c49] dark:bg-[#c0dec2] dark:text-[#13271f]">معاينة بيانات القضية</button>
-          <p className="text-center text-xs leading-6 text-stone-500">المعاينة حالياً لا تحفظ البيانات ولا ترفع الملفات؛ يجري تجهيز قاعدة البيانات وخطوة المراجعة.</p>
+          <button type="submit" disabled={busy} className="w-full rounded-xl bg-[#194537] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#255c49] disabled:cursor-wait disabled:opacity-60 dark:bg-[#c0dec2] dark:text-[#13271f]">{busy ? "جارٍ إرسال القضية…" : "إرسال القضية للمراجعة"}</button>
+          <p className="text-center text-xs leading-6 text-stone-500">سيتم حفظ القضية كطلب مراجعة، ولن تظهر للزوار حتى يعتمدها مالك المنصة.</p>
         </form>
       </div>
     </main>
