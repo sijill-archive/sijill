@@ -7,6 +7,8 @@ import type { FormEvent } from "react";
 import { GeographySelects } from "@/components/geography-selects";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { geography } from "@/lib/geography";
+import { ArchiveMediaFields } from "@/components/archive-media-fields";
+import { uploadArchiveMedia, validateArchiveMedia } from "@/lib/archive-media";
 
 export default function NewFilePage() {
   const router = useRouter();
@@ -62,18 +64,20 @@ export default function NewFilePage() {
     if (!supabase) { setErrorMessage("تعذر الاتصال بقاعدة البيانات."); return; }
     setBusy(true);
     setErrorMessage("");
+    let draftId: string | null = null;
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) { router.replace("/account?mode=login&next=%2Ffiles%2Fnew"); return; }
       const form = document.querySelector<HTMLFormElement>("form[data-person-file-form]");
       if (!form) throw new Error("Form is unavailable");
       const values = new FormData(form);
+      validateArchiveMedia(values);
       const governorate = String(values.get("governorate") ?? "");
       const districtId = String(values.get("district") ?? "");
       const district = geography.governorates.find((item) => item.name === governorate)?.districts.find((item) => item.id === districtId);
       const cityChoice = String(values.get("city") ?? "");
       const city = cityChoice === "__other__" ? String(values.get("cityOther") ?? "").trim() : cityChoice;
-      const { error } = await supabase.from("sijill_person_files").insert({
+      const { data: created, error } = await supabase.from("sijill_person_files").insert({
         created_by: user.id,
         title: preview.title.trim(),
         description: preview.description.trim(),
@@ -84,9 +88,16 @@ export default function NewFilePage() {
         district_name: district?.name ?? null,
         city: city || null,
         location_description: String(values.get("locationDescription") ?? "").trim() || null,
-        status: "submitted",
-      });
+        status: "draft",
+      }).select("id").single();
       if (error) throw error;
+      draftId = created.id;
+      const media = await uploadArchiveMedia(supabase, "files", created.id, values);
+      const { error: submitError } = await supabase.from("sijill_person_files").update({ media, status: "submitted" }).eq("id", created.id);
+      if (submitError) {
+        await supabase.storage.from("sijill-media").remove([...media.images, ...media.videos]);
+        throw submitError;
+      }
       setMessage("أُرسل الملف إلى لوحة الإدارة للمراجعة. سيظهر للزوار بعد اعتماده ونشره.");
       setPreview(null);
       form.reset();
@@ -94,7 +105,10 @@ export default function NewFilePage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Failed to submit Sijill person file", error);
-      setErrorMessage("تعذر إرسال الملف. تحقق من الاتصال وحاول مرة أخرى.");
+      if (draftId) await supabase.from("sijill_person_files").delete().eq("id", draftId);
+      setErrorMessage(error instanceof Error && (error.message.includes("ميغابايت") || error.message.includes("YouTube") || error.message.includes("صور كحد") || error.message.includes("فيديوهات كحد"))
+        ? error.message
+        : "تعذر إرسال الملف أو مرفقاته. تحقق من الاتصال وحاول مرة أخرى.");
     } finally { setBusy(false); }
   };
 
@@ -135,6 +149,8 @@ export default function NewFilePage() {
             <div><h2 className="text-lg font-semibold">الموقع الجغرافي</h2><p className="mt-1 text-sm text-stone-500">اختياري؛ اتركه فارغاً إذا لم يكن معروفاً أو لا ينطبق على الملف.</p></div>
             <GeographySelects idPrefix="file-location" />
           </section>
+
+          <ArchiveMediaFields />
 
           <section className="rounded-xl border border-[#e4dfd2] bg-[#f7f5ee] p-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900">
             <h2 className="font-semibold">تنبيه توثيقي</h2>

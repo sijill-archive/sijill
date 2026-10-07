@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { GeographySelects } from "@/components/geography-selects";
+import { ArchiveMediaFields } from "@/components/archive-media-fields";
+import { uploadArchiveMedia, validateArchiveMedia } from "@/lib/archive-media";
 import { geography } from "@/lib/geography";
 
 const eventTypes = ["قصف أو هجوم", "اعتقال أو اختفاء", "تهجير أو نزوح", "انتهاك", "حدث مدني", "أخرى"];
@@ -34,6 +36,8 @@ export default function NewCasePage() {
     setMessage("");
     setErrorMessage("");
     const values = new FormData(event.currentTarget);
+    try { validateArchiveMedia(values); }
+    catch (error) { setErrorMessage(error instanceof Error ? error.message : "تحقق من المرفقات."); return; }
     const governorateName = String(values.get("governorate") ?? "");
     const districtId = String(values.get("district") ?? "");
     const cityChoice = String(values.get("city") ?? "");
@@ -61,6 +65,7 @@ export default function NewCasePage() {
     }
 
     setBusy(true);
+    let draftId: string | null = null;
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
@@ -69,7 +74,7 @@ export default function NewCasePage() {
       }
 
       const eventDate = String(values.get("eventDate") ?? "");
-      const { error } = await supabase.from("sijill_cases").insert({
+      const { data: created, error } = await supabase.from("sijill_cases").insert({
         created_by: user.id,
         title,
         event_type: String(values.get("eventType") ?? "أخرى"),
@@ -82,9 +87,17 @@ export default function NewCasePage() {
         location_description: String(values.get("locationDescription") ?? "").trim() || null,
         event_date: eventDate || null,
         approximate_date: approximateDate ? String(values.get("approximateDate") ?? "").trim() || null : null,
-        status: "submitted",
-      });
+        status: "draft",
+      }).select("id").single();
       if (error) throw error;
+
+      draftId = created.id;
+      const media = await uploadArchiveMedia(supabase, "cases", created.id, values);
+      const { error: submitError } = await supabase.from("sijill_cases").update({ media, status: "submitted" }).eq("id", created.id);
+      if (submitError) {
+        await supabase.storage.from("sijill-media").remove([...media.images, ...media.videos]);
+        throw submitError;
+      }
 
       form.reset();
       setApproximateDate(false);
@@ -93,7 +106,12 @@ export default function NewCasePage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Failed to submit Sijill case", error);
-      setErrorMessage("لم تُحفظ القضية. تحقق من اتصال الإنترنت وحاول مرة أخرى؛ إذا تكررت المشكلة أرسل لنا لقطة للخطأ.");
+      if (draftId) {
+        await supabase.from("sijill_cases").delete().eq("id", draftId);
+      }
+      setErrorMessage(error instanceof Error && (error.message.includes("ميغابايت") || error.message.includes("YouTube") || error.message.includes("صور كحد") || error.message.includes("فيديوهات كحد"))
+        ? error.message
+        : "لم تُرسل القضية أو مرفقاتها. تحقق من الاتصال وحاول مرة أخرى.");
     } finally {
       setBusy(false);
     }
@@ -165,7 +183,7 @@ export default function NewCasePage() {
 
           <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
             <h2 className="text-lg font-semibold">مواد ومصادر داعمة</h2>
-            <p className="rounded-xl bg-stone-50 p-4 text-sm leading-7 text-stone-600 dark:bg-stone-900 dark:text-stone-400">رفع الصور والوثائق والفيديوهات وروابط YouTube سيُفعّل بعد إعداد التخزين الآمن. لا ترفق معلومات حساسة هنا الآن؛ أرسل بيانات القضية النصية فقط.</p>
+            <ArchiveMediaFields />
           </section>
 
           <section className="rounded-xl border border-[#e4dfd2] bg-[#f7f5ee] p-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900">
