@@ -30,6 +30,7 @@ export default function WorkspacePage() {
   const [messages, setMessages] = useState<Array<{ id: string; body: string; sender_id: string; created_at: string }>>([]);
   const [profiles, setProfiles] = useState<Array<{ user_id: string; display_name: string }>>([]);
   const [myDisplayName, setMyDisplayName] = useState("");
+  const [myLanguage, setMyLanguage] = useState<"ar" | "en">("ar");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -77,16 +78,19 @@ export default function WorkspacePage() {
   useEffect(() => { if (ready && ["inbox", "messages"].includes(tab)) void loadConversations(); }, [ready, tab, loadConversations]);
   useEffect(() => {
     if (!supabase || !userId) return;
-    void supabase.from("sijill_public_profiles").select("display_name").eq("user_id", userId).maybeSingle().then(({ data }) => setMyDisplayName(data?.display_name ?? ""));
+    void supabase.from("sijill_public_profiles").select("display_name,preferred_language").eq("user_id", userId).maybeSingle().then(({ data }) => { setMyDisplayName(data?.display_name ?? ""); setMyLanguage(data?.preferred_language === "en" ? "en" : "ar"); });
   }, [supabase, userId]);
   useEffect(() => {
     if (!supabase || !selectedConversation) { setMessages([]); return; }
     let active = true;
-    void supabase.from("sijill_direct_messages").select("id,body,sender_id,created_at").eq("conversation_id", selectedConversation).order("created_at", { ascending: true }).then(({ data }) => {
+    const refresh = async () => {
+      const { data } = await supabase.from("sijill_direct_messages").select("id,body,sender_id,created_at").eq("conversation_id", selectedConversation).order("created_at", { ascending: true });
       if (active) setMessages((data ?? []) as typeof messages);
-    });
+    };
+    void refresh();
     void supabase.from("sijill_conversation_members").update({ last_read_at: new Date().toISOString() }).eq("conversation_id", selectedConversation).eq("user_id", userId);
-    return () => { active = false; };
+    const refreshTimer = window.setInterval(() => { void refresh(); }, 10000);
+    return () => { active = false; window.clearInterval(refreshTimer); };
   }, [supabase, selectedConversation, userId]);
 
   const show = (next: Tab) => { setTab(next); setNotice(""); setError(""); router.replace(`/workspace?tab=${next}`, { scroll: false }); };
@@ -135,7 +139,7 @@ export default function WorkspacePage() {
 
       {tab === "messages" && <section className="mt-6 grid gap-5 lg:grid-cols-[minmax(260px,1fr)_2fr]"><div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-[#1a211d]"><h2 className="text-xl font-bold">مراسلة مستخدم</h2><p className="mt-1 text-sm text-stone-500">يظهر هنا اسم الحساب فقط، ولا تُعرض عناوين البريد.</p><form onSubmit={(event) => void startConversation(event, "direct")} className="mt-5 space-y-3"><select required name="recipient" defaultValue="" className="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 text-sm dark:border-stone-700"><option value="" disabled>اختر مستخدماً</option>{profiles.filter((profile) => profile.user_id !== userId).map((profile) => <option key={profile.user_id} value={profile.user_id}>{profile.display_name}</option>)}</select><input required name="subject" maxLength={180} placeholder="موضوع المحادثة" className="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 text-sm dark:border-stone-700"/><button disabled={busy} className="w-full rounded-lg bg-[#194537] px-3 py-2 text-sm font-semibold text-white">بدء المراسلة</button></form><ul className="mt-5 space-y-2">{conversations.filter((item) => item.kind === "direct").map((item) => <li key={item.id}><button onClick={() => setSelectedConversation(item.id)} className="w-full rounded-xl border border-stone-200 p-3 text-right dark:border-stone-700"><span className="block font-semibold">{item.peerName}</span><span className="mt-1 block text-xs text-stone-500">{item.subject}</span></button></li>)}</ul></div><ConversationPanel conversation={conversation} messages={messages} userId={userId} onSubmit={sendMessage} busy={busy}/></section>}
 
-      {tab === "account" && <AccountSettings onSubmit={updateAccount} busy={busy} email={email} initialName={myDisplayName} />}
+      {tab === "account" && <AccountSettings onSubmit={updateAccount} busy={busy} email={email} initialName={myDisplayName} initialLanguage={myLanguage} />}
       <p className="mt-7 text-xs leading-6 text-stone-500">سِجِلّ يحفظ المعلومات وينظمها؛ ولا يحدد الذنب أو البراءة.</p>
     </div></main>;
 }
@@ -144,8 +148,10 @@ function ConversationPanel({ conversation, messages, userId, onSubmit, busy }: {
   return <section className="flex min-h-[420px] flex-col rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-[#1a211d]"><h2 className="border-b border-stone-100 pb-4 font-bold dark:border-stone-800">{conversation ? `${conversation.peerName} · ${conversation.subject}` : "اختر محادثة لعرض الرسائل"}</h2><div className="flex-1 space-y-3 overflow-y-auto py-4">{messages.map((message) => <p key={message.id} className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.sender_id === userId ? "mr-auto bg-[#194537] text-white" : "ml-auto bg-stone-100 dark:bg-stone-800"}`}>{message.body}</p>)}</div>{conversation && <form onSubmit={onSubmit} className="flex gap-2 border-t border-stone-100 pt-4 dark:border-stone-800"><textarea required name="body" maxLength={10000} rows={2} placeholder="اكتب رسالتك" className="min-w-0 flex-1 resize-y rounded-xl border border-stone-300 bg-transparent px-3 py-2 text-sm dark:border-stone-700"/><button disabled={busy} className="rounded-xl bg-[#194537] px-4 text-sm font-semibold text-white">إرسال</button></form>}</section>;
 }
 
-function AccountSettings({ onSubmit, busy, email, initialName }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; busy: boolean; email: string; initialName: string }) {
+function AccountSettings({ onSubmit, busy, email, initialName, initialLanguage }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; busy: boolean; email: string; initialName: string; initialLanguage: "ar" | "en" }) {
   const [name, setName] = useState(initialName);
+  const [language, setLanguage] = useState<"ar" | "en">(initialLanguage);
   useEffect(() => { if (initialName) setName(initialName); }, [initialName]);
-  return <form onSubmit={onSubmit} className="mt-6 max-w-2xl space-y-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-[#1a211d] sm:p-7"><h2 className="text-xl font-bold">حسابي</h2><p className="text-sm text-stone-500" dir="ltr">{email}</p><label className="block text-sm font-semibold">الاسم الذي يظهر بجانب مساهماتك<input required name="display_name" value={name} maxLength={120} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><label className="block text-sm font-semibold">كلمة مرور جديدة <span className="font-normal text-stone-500">(اتركها فارغة إن لم ترغب بتغييرها)</span><input name="password" type="password" minLength={8} autoComplete="new-password" className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><label className="block text-sm font-semibold">لغة الحساب<select name="language" defaultValue="ar" className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"><option value="ar">العربية</option><option value="en">English</option></select></label><p className="text-xs leading-6 text-stone-500">يُحفظ اختيار اللغة في إعدادات الحساب، وستُترجم بقية صفحات الموقع ضمن مرحلة التوطين.</p><button disabled={busy} className="rounded-xl bg-[#194537] px-5 py-3 text-sm font-semibold text-white">حفظ الإعدادات</button></form>;
+  useEffect(() => { setLanguage(initialLanguage); }, [initialLanguage]);
+  return <form onSubmit={onSubmit} className="mt-6 max-w-2xl space-y-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-[#1a211d] sm:p-7"><h2 className="text-xl font-bold">حسابي</h2><p className="text-sm text-stone-500" dir="ltr">{email}</p><label className="block text-sm font-semibold">الاسم الذي يظهر بجانب مساهماتك<input required name="display_name" value={name} maxLength={120} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><label className="block text-sm font-semibold">كلمة مرور جديدة <span className="font-normal text-stone-500">(اتركها فارغة إن لم ترغب بتغييرها)</span><input name="password" type="password" minLength={8} autoComplete="new-password" className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><label className="block text-sm font-semibold">لغة الحساب<select name="language" value={language} onChange={(event) => setLanguage(event.target.value as "ar" | "en")} className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"><option value="ar">العربية</option><option value="en">English</option></select></label><p className="text-xs leading-6 text-stone-500">يُحفظ اختيار اللغة في إعدادات الحساب، وستُترجم بقية صفحات الموقع ضمن مرحلة التوطين.</p><button disabled={busy} className="rounded-xl bg-[#194537] px-5 py-3 text-sm font-semibold text-white">حفظ الإعدادات</button></form>;
 }
