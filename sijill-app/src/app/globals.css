@@ -53,6 +53,72 @@
   --archive-frame-fill: #141a16;
 }
 
+.archive-file-tab {
+  overflow: hidden;
+  border: 1px solid rgba(169, 146, 94, .5);
+  border-radius: 0 14px 14px 14px;
+  background: linear-gradient(120deg, #d9c89e 0%, #c9b585 100%);
+  color: #1e261f;
+}
+
+.archive-file-tab > summary {
+  position: relative;
+}
+
+.archive-file-tab > summary::marker {
+  content: "";
+}
+
+.archive-vote-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem;
+  padding: .55rem;
+  border: 1px solid rgba(192, 222, 194, .13);
+  border-radius: 1rem;
+  background: rgba(23, 33, 28, .88);
+}
+
+.archive-vote-button {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: .65rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: .45rem .8rem;
+  font-size: .8rem;
+  transition: background-color .18s ease, border-color .18s ease, opacity .18s ease;
+}
+
+.archive-vote-button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.archive-vote-button--supporting {
+  border-color: rgba(134, 190, 143, .25);
+  background: rgba(65, 112, 74, .18);
+  color: #c0dec2;
+}
+
+.archive-vote-button--supporting.is-selected {
+  border-color: rgba(134, 190, 143, .55);
+  background: rgba(65, 112, 74, .38);
+}
+
+.archive-vote-button--opposing {
+  border-color: rgba(197, 125, 119, .23);
+  background: rgba(112, 59, 56, .16);
+  color: #dfaaa4;
+}
+
+.archive-vote-button--opposing.is-selected {
+  border-color: rgba(197, 125, 119, .5);
+  background: rgba(112, 59, 56, .34);
+}
+
 @media (prefers-color-scheme: dark) {
   .map-aura {
     background: radial-gradient(circle, rgba(62, 115, 88, .28) 0%, rgba(58, 94, 72, .13) 42%, rgba(19, 25, 22, 0) 74%);
