@@ -48,9 +48,12 @@ export function SiteMenu() {
             <nav aria-label="خيارات الحساب" className="mt-3 grid gap-2">
               <Link onClick={close} href={contributionPath("case")} className="rounded-xl bg-[#194537] px-4 py-3 text-sm font-semibold text-white hover:bg-[#255c49]">＋ إضافة قضية</Link>
               <Link onClick={close} href={contributionPath("file")} className="rounded-xl bg-[#194537] px-4 py-3 text-sm font-semibold text-white hover:bg-[#255c49]">＋ إضافة ملف</Link>
-              <Link onClick={close} href="/testimonies" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">شهاداتي</Link>
+              <Link onClick={close} href="/workspace?tab=cases" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">القضايا المضافة</Link>
+              <Link onClick={close} href="/workspace?tab=files" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">الملفات المضافة</Link>
+              <Link onClick={close} href="/workspace?tab=testimonies" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">شهاداتي</Link>
               <Link onClick={close} href="/workspace?tab=inbox" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">الصندوق الوارد</Link>
-              <Link onClick={close} href="/workspace?tab=support" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">مخاطبة الإدارة</Link>
+              <Link onClick={close} href="/workspace?tab=messages" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">مراسلة مستخدم</Link>
+              <Link onClick={close} href="/workspace?tab=inbox" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">مخاطبة الإدارة</Link>
               <Link onClick={close} href="/workspace?tab=account" className="rounded-xl border border-[#d9ded5] px-4 py-3 text-sm font-semibold hover:bg-white dark:border-stone-700 dark:hover:bg-stone-800">حسابي</Link>
               <button onClick={async () => { await createBrowserSupabaseClient()?.auth.signOut(); close(); }} className="rounded-xl px-4 py-3 text-right text-sm font-semibold text-rose-800 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30">تسجيل الخروج</button>
             </nav>

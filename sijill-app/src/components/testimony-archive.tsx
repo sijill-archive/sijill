@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import Link from "next/link";
 
 type Testimony = {
   id: string;
@@ -13,6 +14,7 @@ type Testimony = {
   evidence_level: number;
   source_type: string;
   created_at: string;
+  created_by: string | null;
 };
 
 type Side = "supporting" | "opposing";
@@ -38,6 +40,7 @@ function formatDate(value: string | null) {
 
 export function TestimonyArchive({ parentType, parentId }: { parentType: "case" | "person_file"; parentId: string }) {
   const [collections, setCollections] = useState<Record<Side, Collection>>({ supporting: initialCollection, opposing: initialCollection });
+  const [authors, setAuthors] = useState<Record<string, string>>({});
 
   const loadPage = useCallback(async (side: Side, offset: number, replace = false) => {
     const supabase = createBrowserSupabaseClient();
@@ -48,10 +51,15 @@ export function TestimonyArchive({ parentType, parentId }: { parentType: "case" 
 
     setCollections((current) => ({ ...current, [side]: { ...current[side], loading: true, error: false } }));
     const parentColumn = parentType === "case" ? "case_id" : "person_file_id";
-    const query = supabase.from("sijill_testimonies").select("id,title,description,event_date,city,location_description,evidence_level,source_type,created_at", { count: offset === 0 ? "exact" : undefined })
+    const query = supabase.from("sijill_testimonies").select("id,title,description,event_date,city,location_description,evidence_level,source_type,created_at,created_by", { count: offset === 0 ? "exact" : undefined })
       .eq(parentColumn, parentId).eq("status", "published").eq("public_consent", true).eq("position", side)
       .order("event_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).range(offset, offset + pageSize - 1);
     const { data, count, error } = await query;
+    const authorIds = [...new Set((data ?? []).map((item) => item.created_by).filter((id): id is string => Boolean(id)))];
+    if (authorIds.length) {
+      const { data: profiles } = await supabase.from("sijill_public_profiles").select("user_id,display_name").in("user_id", authorIds);
+      if (profiles) setAuthors((current) => ({ ...current, ...Object.fromEntries(profiles.map((profile) => [profile.user_id, profile.display_name])) }));
+    }
     setCollections((current) => ({
       ...current,
       [side]: {
@@ -85,6 +93,7 @@ export function TestimonyArchive({ parentType, parentId }: { parentType: "case" 
             <div className="border-t border-black/10 px-4 py-4 text-sm leading-7 text-stone-200">
               <p className="text-xs text-[#d5c293]">{formatDate(item.event_date)} · {[item.city, item.location_description].filter(Boolean).join("، ") || "الموقع غير محدد"}</p>
               <p className="mt-3 whitespace-pre-wrap">{item.description}</p>
+              <p className="mt-3 text-xs text-stone-400">مقدم الشهادة: {authors[item.created_by ?? ""] ?? "مستخدم سِجِلّ"}</p>
               <p className="mt-3 border-t border-white/10 pt-3 text-xs text-stone-400">المصدر: {testimonyKinds[item.source_type] ?? "مصدر آخر"} · مستوى التوثيق: {item.evidence_level} من 5</p>
               <p className="mt-2 text-[11px] leading-6 text-stone-500">هذا سجل توثيقي منسوب إلى مقدم الشهادة ومصدرها، ولا يمثل حكماً قضائياً.</p>
             </div>
@@ -96,7 +105,7 @@ export function TestimonyArchive({ parentType, parentId }: { parentType: "case" 
   };
 
   return <section className="mt-6 space-y-3" aria-label="سجل الشهادات">
-    <div className="mb-3"><p className="text-xs text-[#b69a6d]">السجلات والشهادات المرتبطة</p><h2 className="mt-1 text-xl font-semibold">الشهادات</h2></div>
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs text-[#b69a6d]">السجلات والشهادات المرتبطة</p><h2 className="mt-1 text-xl font-semibold">الشهادات</h2></div><Link href={`/testimonies/new?${parentType === "case" ? "case_id" : "person_file_id"}=${encodeURIComponent(parentId)}`} className="rounded-lg bg-[#c0dec2] px-3 py-2 text-xs font-semibold text-[#14251d]">＋ إضافة شهادة</Link></div>
     {panel("supporting", "الشهادات المؤيدة", "bg-emerald-400")}
     {panel("opposing", "الشهادات المعارضة", "bg-rose-400")}
   </section>;

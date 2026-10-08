@@ -10,7 +10,7 @@ import type { ArchiveMedia } from "@/lib/archive-media";
 import { TestimonyArchive } from "@/components/testimony-archive";
 import { ArchiveVoteBar } from "@/components/archive-vote-bar";
 
-type FileRecord = { id: string; title: string; description: string; case_id: string | null; governorate: string | null; district_name: string | null; city: string | null; media: ArchiveMedia | null };
+type FileRecord = { id: string; title: string; description: string; case_id: string | null; governorate: string | null; district_name: string | null; city: string | null; media: ArchiveMedia | null; created_by: string };
 type LinkedCase = { id: string; title: string };
 const summaryLength = 260;
 
@@ -18,17 +18,20 @@ export default function PublicPersonFilePage() {
   const { id } = useParams<{ id: string }>();
   const [record, setRecord] = useState<FileRecord | null>(null);
   const [linkedCases, setLinkedCases] = useState<LinkedCase[]>([]);
+  const [authorName, setAuthorName] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
     const supabase = createBrowserSupabaseClient();
     if (!supabase || !id) { setLoading(false); return; }
     const load = async () => {
-      const { data } = await supabase.from("sijill_person_files").select("id,title,description,case_id,governorate,district_name,city,media").eq("id", id).eq("status", "published").maybeSingle();
+      const { data } = await supabase.from("sijill_person_files").select("id,title,description,case_id,governorate,district_name,city,media,created_by").eq("id", id).eq("status", "published").maybeSingle();
       if (!active) return;
       if (!data) { setLoading(false); return; }
       const file = data as FileRecord;
       setRecord(file);
+      const author = await supabase.from("sijill_public_profiles").select("display_name").eq("user_id", file.created_by).maybeSingle();
+      if (active) setAuthorName(author.data?.display_name ?? "مستخدم سِجِلّ");
       const { data: links } = await supabase.from("sijill_case_person_files").select("case_id").eq("person_file_id", id);
       const caseIds = [...new Set([...(links ?? []).map((link) => link.case_id), file.case_id].filter((caseId): caseId is string => Boolean(caseId)))];
       if (caseIds.length) {
@@ -49,6 +52,7 @@ export default function PublicPersonFilePage() {
       <article className="archive-frame archive-frame--file mt-10 p-6 sm:p-9">
         <p className="text-right text-xs text-[#b69a6d]">ملف شخص منشور في الأرشيف</p>
         <h1 className="mt-4 border-b border-white/10 pb-6 text-center text-3xl font-bold sm:text-4xl">{record.title}</h1>
+        <p className="mt-3 text-center text-xs text-stone-500">أُضيف بواسطة: {authorName || "…"}</p>
         <ArchiveMediaHero media={record.media} />
 
         <section className="mt-7 border-t border-white/10 pt-6">

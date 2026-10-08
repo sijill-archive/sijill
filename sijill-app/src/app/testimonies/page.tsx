@@ -43,13 +43,15 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
     location_description: string;
     evidence_level: number;
     source_type: string;
+    created_by: string | null;
+    author_name?: string;
   }> = [];
   let unavailable = !supabase;
 
   if (supabase) {
     const { data, error } = await supabase
       .from("sijill_testimonies")
-      .select("id,title,description,event_date,country,city,location_description,evidence_level,source_type")
+      .select("id,title,description,event_date,country,city,location_description,evidence_level,source_type,created_by")
       .eq("status", "published")
       .eq("public_consent", true)
       .order("event_date", { ascending: false, nullsFirst: false })
@@ -60,6 +62,9 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
       console.error("Published testimonies query failed", error.code ?? "unknown");
     } else {
       const rows = data ?? [];
+      const authorIds = [...new Set(rows.map((item) => item.created_by).filter((id): id is string => Boolean(id)))];
+      const { data: profiles } = authorIds.length ? await supabase.from("sijill_public_profiles").select("user_id,display_name").in("user_id", authorIds) : { data: [] };
+      const authorNames = new Map((profiles ?? []).map((profile) => [profile.user_id, profile.display_name]));
       testimonies = rows.filter((item) => {
         const q = (filters.q ?? "").trim().toLocaleLowerCase("ar");
         const searchMatch = !q || `${item.title} ${item.description} ${item.city}`.toLocaleLowerCase("ar").includes(q);
@@ -69,7 +74,7 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
         const cityMatch = !filters.city || item.city === filters.city;
         const yearMatch = !filters.year || item.event_date?.startsWith(`${filters.year}-`);
         return searchMatch && governorateMatch && districtMatch && cityMatch && yearMatch;
-      });
+      }).map((item) => ({ ...item, author_name: item.created_by ? authorNames.get(item.created_by) ?? "مستخدم سِجِلّ" : "مستخدم سِجِلّ" }));
     }
   }
 
@@ -107,6 +112,7 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
                   <span>{formatDate(testimony.event_date)}</span><span aria-hidden="true">·</span><span>{testimony.city}، {testimony.country}</span>
                 </div>
                 <h2 className="text-xl font-bold leading-8 text-stone-900 dark:text-stone-100">{testimony.title}</h2>
+                <p className="mt-2 text-xs text-stone-500">مقدم الشهادة: {testimony.author_name}</p>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-8 text-stone-700 dark:text-stone-300">{testimony.description}</p>
                 <p className="mt-4 border-r-2 border-orange-400 pr-3 text-xs leading-6 text-stone-500 dark:text-stone-400">الموقع: {testimony.location_description}</p>
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-stone-100 pt-4 dark:border-stone-800">
