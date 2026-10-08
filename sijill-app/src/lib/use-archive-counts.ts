@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
-export function useArchiveCounts(governorate?: string) {
+export function useArchiveCounts(governorate?: string, district?: string) {
   const [counts, setCounts] = useState({ cases: 0, files: 0 });
 
   useEffect(() => {
@@ -17,12 +17,16 @@ export function useArchiveCounts(governorate?: string) {
         casesQuery = casesQuery.eq("governorate", governorate);
         filesQuery = filesQuery.eq("governorate", governorate);
       }
+      if (district) {
+        casesQuery = casesQuery.eq("district_name", district);
+        filesQuery = filesQuery.eq("district_name", district);
+      }
       const [cases, files] = await Promise.all([casesQuery, filesQuery]);
       if (active) setCounts({ cases: cases.count ?? 0, files: files.count ?? 0 });
     };
     void load();
     return () => { active = false; };
-  }, [governorate]);
+  }, [governorate, district]);
 
   return counts;
 }

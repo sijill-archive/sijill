@@ -48,8 +48,10 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
 
   if (supabase) {
     const { data, error } = await supabase
-      .from("testimonies")
+      .from("sijill_testimonies")
       .select("id,title,description,event_date,country,city,location_description,evidence_level,source_type")
+      .eq("status", "published")
+      .eq("public_consent", true)
       .order("event_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
 

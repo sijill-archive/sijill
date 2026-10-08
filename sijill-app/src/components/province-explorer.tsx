@@ -22,12 +22,12 @@ function districtViewBox(district: District) {
 
 export function ProvinceExplorer({ slug }: { slug: string }) {
   const province = mapData.governorates.find((item) => item.slug === slug) as Province | undefined;
-  const archiveCounts = useArchiveCounts(province?.name);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoveredPlace, setHoveredPlace] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const selected = province?.districts.find((district) => district.id === selectedId) ?? null;
+  const archiveCounts = useArchiveCounts(province?.name, selected?.name);
   const hovered = province?.districts.find((district) => district.id === hoveredId) ?? null;
   const viewBoxText = selected ? districtViewBox(selected) : province?.viewBox ?? "0 0 780 620";
   const [minX, minY, viewWidth, viewHeight] = viewBoxText.split(" ").map(Number);
@@ -124,7 +124,7 @@ export function ProvinceExplorer({ slug }: { slug: string }) {
 
           {selected?.places.map((place, index) => {
             const verticalOffset = index % 2 === 0 ? "-translate-y-[125%]" : "translate-y-[15%]";
-            return <Link key={place.sourceId} href={`/locations/${encodeURIComponent(place.name)}`} onMouseEnter={() => setHoveredPlace(place.name)} onMouseLeave={() => setHoveredPlace(null)} onFocus={() => setHoveredPlace(place.name)} onBlur={() => setHoveredPlace(null)} title={`تصفية الأرشيف حسب ${place.name}`} className={`absolute z-20 inline-flex -translate-x-1/2 ${verticalOffset} items-center gap-1.5 whitespace-nowrap rounded-full border border-white/15 bg-[#17241d]/85 px-2 py-1 text-[10px] font-medium text-[#f4f1df] shadow-sm backdrop-blur-sm transition hover:z-30 hover:scale-110 hover:border-[#f1d697] hover:text-[#f1d697] sm:text-xs`} style={{ left: `${((place.x - minX) / viewWidth) * 100}%`, top: `${((place.y - minY) / viewHeight) * 100}%` }}>
+            return <Link key={place.sourceId} href={`/locations/${encodeURIComponent(place.name)}?governorate=${encodeURIComponent(province.name)}&district=${encodeURIComponent(selected.name)}`} onMouseEnter={() => setHoveredPlace(place.name)} onMouseLeave={() => setHoveredPlace(null)} onFocus={() => setHoveredPlace(place.name)} onBlur={() => setHoveredPlace(null)} title={`تصفية الأرشيف حسب ${place.name}`} className={`absolute z-20 inline-flex -translate-x-1/2 ${verticalOffset} items-center gap-1.5 whitespace-nowrap rounded-full border border-white/15 bg-[#17241d]/85 px-2 py-1 text-[10px] font-medium text-[#f4f1df] shadow-sm backdrop-blur-sm transition hover:z-30 hover:scale-110 hover:border-[#f1d697] hover:text-[#f1d697] sm:text-xs`} style={{ left: `${((place.x - minX) / viewWidth) * 100}%`, top: `${((place.y - minY) / viewHeight) * 100}%` }}>
               <span className="size-2 shrink-0 rounded-full border border-[#f5edcf] bg-[#d6b36d] shadow-[0_0_0_3px_rgba(214,179,109,.18),0_0_12px_3px_rgba(214,179,109,.48)]" />{place.name}
             </Link>;
           })}
@@ -134,7 +134,7 @@ export function ProvinceExplorer({ slug }: { slug: string }) {
           <span>{selected ? `${selected.places.length} مدينة وبلدة تظهر داخل المنطقة المحددة` : "الفواصل المضيئة تحدد حدود المناطق"}</span>
           <span>المصدر الإداري: OpenSyria؛ الحدود المرجعية: geoBoundaries، 2017</span>
         </div>
-        <CaseArchiveList governorate={province.name} />
+        <CaseArchiveList governorate={province.name} district={selected?.name} />
       </section>
       <footer className="border-t border-white/10 px-5 py-6 text-center text-[10px] leading-6 text-[#7f9383]">تظهر المدن والبلدات عند توفر إحداثيات تقع ضمن المنطقة الإدارية. بعض الحدود مرجعية تاريخية وفق بيانات geoBoundaries لعام 2017.</footer>
     </main>

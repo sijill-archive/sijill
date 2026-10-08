@@ -8,6 +8,7 @@ import aleppoMap from "@/data/aleppo-explorer.json";
 import { ContributionButtons } from "@/components/site-menu";
 import { StatisticsStrip } from "@/components/statistics-strip";
 import { useArchiveCounts } from "@/lib/use-archive-counts";
+import { CaseArchiveList } from "@/components/case-archive-list";
 
 type District = (typeof aleppoMap.districts)[number];
 
@@ -32,12 +33,12 @@ function districtViewBox(district: District) {
 }
 
 export function AleppoExplorer() {
-  const archiveCounts = useArchiveCounts("حلب");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoveredPlace, setHoveredPlace] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const selected = aleppoMap.districts.find((district) => district.id === selectedId) ?? null;
+  const archiveCounts = useArchiveCounts("حلب", selected?.name);
   const hovered = aleppoMap.districts.find((district) => district.id === hoveredId) ?? null;
   const viewBox = (selected ? districtViewBox(selected) : aleppoMap.viewBox).split(" ").map(Number);
   const [minX, minY, viewWidth, viewHeight] = viewBox;
@@ -133,7 +134,7 @@ export function AleppoExplorer() {
 
           {selected?.places.map((place, index) => {
             const verticalOffset = index % 2 === 0 ? "-translate-y-[125%]" : "translate-y-[15%]";
-            return <Link key={place.slug} href={`/locations/${encodeURIComponent(place.name)}`} onMouseEnter={() => setHoveredPlace(place.name)} onMouseLeave={() => setHoveredPlace(null)} onFocus={() => setHoveredPlace(place.name)} onBlur={() => setHoveredPlace(null)} title={`تصفية الأرشيف حسب ${place.name}`} className={`absolute z-20 inline-flex -translate-x-1/2 ${verticalOffset} items-center gap-1.5 whitespace-nowrap text-[10px] font-medium text-[#f4f1df] drop-shadow-[0_1px_3px_rgba(0,0,0,.95)] transition hover:scale-110 hover:text-[#f1d697] sm:text-xs`} style={{ left: `${((place.x - minX) / viewWidth) * 100}%`, top: `${((place.y - minY) / viewHeight) * 100}%` }}>
+            return <Link key={place.slug} href={`/locations/${encodeURIComponent(place.name)}?governorate=حلب&district=${encodeURIComponent(selected.name)}`} onMouseEnter={() => setHoveredPlace(place.name)} onMouseLeave={() => setHoveredPlace(null)} onFocus={() => setHoveredPlace(place.name)} onBlur={() => setHoveredPlace(null)} title={`تصفية الأرشيف حسب ${place.name}`} className={`absolute z-20 inline-flex -translate-x-1/2 ${verticalOffset} items-center gap-1.5 whitespace-nowrap text-[10px] font-medium text-[#f4f1df] drop-shadow-[0_1px_3px_rgba(0,0,0,.95)] transition hover:scale-110 hover:text-[#f1d697] sm:text-xs`} style={{ left: `${((place.x - minX) / viewWidth) * 100}%`, top: `${((place.y - minY) / viewHeight) * 100}%` }}>
               <span className="size-2 rounded-full border border-[#f5edcf] bg-[#d6b36d] shadow-[0_0_0_3px_rgba(214,179,109,.18),0_0_12px_3px_rgba(214,179,109,.48)]" />{place.name}
             </Link>;
           })}
@@ -143,6 +144,7 @@ export function AleppoExplorer() {
           <span>{selected ? `${selected.places.length} مدن وبلدات معروضة على الخريطة` : "الفواصل المضيئة تحدد حدود المناطق"}</span>
           <span>حدود إدارية مرجعية — 2017</span>
         </div>
+        <CaseArchiveList governorate="حلب" district={selected?.name} />
       </section>
       <footer className="border-t border-white/10 px-5 py-6 text-center text-[10px] text-[#7f9383]">المناطق الإدارية مستندة إلى geoBoundaries؛ المناطق الفرعية معروضة للتنقل داخل الأرشيف.</footer>
     </main>
