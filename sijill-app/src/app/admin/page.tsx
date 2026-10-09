@@ -11,6 +11,7 @@ type VerificationRequest = { id: string; subject_type: string; request_type: str
 type CaseSubmission = { id: string; title: string; event_type: string; description: string; country: string; governorate: string; district_name: string; city: string; location_description: string | null; event_date: string | null; approximate_date: string | null; media: ArchiveMedia | null; created_at: string; status: string };
 type PersonFile = { id: string; title: string; description: string; case_id: string | null; governorate: string | null; district_name: string | null; city: string | null; media: ArchiveMedia | null; created_at: string; status: string };
 type FileCaseLink = { case_id: string; person_file_id: string };
+type YearStat = { year: number; cases: number; files: number };
 type DashboardData = {
   totals: { cases: number; files: number; testimonies: number; articles: number };
   pending: { cases: number; files: number; testimonies: number; requests: number };
@@ -21,6 +22,7 @@ type DashboardData = {
   cases: CaseSubmission[];
   files: PersonFile[];
   fileLinks: FileCaseLink[];
+  yearlyStats: YearStat[];
 };
 
 const emptyData: DashboardData = {
@@ -33,6 +35,7 @@ const emptyData: DashboardData = {
   cases: [],
   files: [],
   fileLinks: [],
+  yearlyStats: [],
 };
 
 const actionLabels: Record<string, string> = { created: "إنشاء", updated: "تعديل", deleted: "حذف" };
@@ -63,10 +66,10 @@ export default function AdminDashboardPage() {
       const owner = roleRecord?.role === "owner";
       if (active) setIsOwner(owner);
 
-      const [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows, fileLinkRows] = await Promise.all([
-        supabase.from("sijill_cases").select("id", { count: "exact", head: true }),
-        supabase.from("sijill_person_files").select("id", { count: "exact", head: true }),
-        supabase.from("sijill_testimonies").select("id", { count: "exact", head: true }),
+      const [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows, fileLinkRows, yearlyStats] = await Promise.all([
+        supabase.from("sijill_cases").select("id", { count: "exact", head: true }).eq("status", "published"),
+        supabase.from("sijill_person_files").select("id", { count: "exact", head: true }).eq("status", "published"),
+        supabase.from("sijill_testimonies").select("id", { count: "exact", head: true }).eq("status", "published"),
         supabase.from("sijill_articles").select("id", { count: "exact", head: true }),
         supabase.from("sijill_cases").select("id", { count: "exact", head: true }).eq("status", "submitted"),
         supabase.from("sijill_person_files").select("id", { count: "exact", head: true }).eq("status", "submitted"),
@@ -79,10 +82,11 @@ export default function AdminDashboardPage() {
         supabase.from("sijill_person_files").select("id,title,description,case_id,governorate,district_name,city,media,created_at,status").neq("status", "archived").order("title", { ascending: true }).limit(500),
         owner ? supabase.from("sijill_activity_log").select("id,actor_id,record_type,record_id,action,changed_fields,happened_at").order("happened_at", { ascending: false }).limit(8) : Promise.resolve({ data: [], error: null }),
         supabase.from("sijill_case_person_files").select("case_id,person_file_id"),
+        supabase.rpc("sijill_admin_yearly_archive_stats"),
       ]);
 
       if (!active) return;
-      const queryErrors = [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows, fileLinkRows].filter((result) => result.error);
+      const queryErrors = [caseTotal, fileTotal, testimonyTotal, articleTotal, casePending, filePending, testimonyPending, requestPending, requestRows, caseRows, allCases, fileRows, allFiles, activityRows, fileLinkRows, yearlyStats].filter((result) => result.error);
       if (queryErrors.length) {
         const missingTable = queryErrors.some((result) => result.error?.code === "PGRST205" || result.error?.code === "42P01");
         setDatabaseMissing(missingTable);
@@ -99,6 +103,7 @@ export default function AdminDashboardPage() {
           cases: (allCases.data ?? []) as CaseSubmission[],
           files: (allFiles.data ?? []) as PersonFile[],
           fileLinks: (fileLinkRows.data ?? []) as FileCaseLink[],
+          yearlyStats: (yearlyStats.data ?? []) as YearStat[],
           activity: (activityRows.data ?? []) as Activity[],
         });
       }
@@ -158,21 +163,26 @@ export default function AdminDashboardPage() {
     {databaseMissing && <div role="alert" className="rounded-2xl border border-amber-400/30 bg-amber-950/30 p-4 text-sm leading-7 text-amber-100"><strong>قاعدة الإدارة لم تُجهّز بعد.</strong> طبّق الترحيل الموجود في <code dir="ltr">supabase/migrations</code> من صفحة SQL Editor في Supabase، ثم أضف دور المالك كما يوضح <code dir="ltr">supabase/README.md</code>.</div>}
     {loadError && <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-950/30 p-4 text-sm leading-7 text-rose-100">تعذر تحميل بعض إحصاءات الإدارة. تحقق من اتصال Supabase وسياسات الوصول ثم أعد تحميل الصفحة.</div>}
 
-    <section aria-label="إحصائيات الموقع" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="إحصائيات الموقع" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {[
-        { label: "القضايا", value: data.totals.cases, hint: `${data.pending.cases} قيد المراجعة`, icon: "◈" },
-        { label: "ملفات الأشخاص", value: data.totals.files, hint: `${data.pending.files} قيد المراجعة`, icon: "▤" },
-        { label: "القضايا المنشورة", value: data.cases.filter((item) => item.status === "published").length, hint: "متاحة للزوار", icon: "✓" },
-        { label: "الملفات المنشورة", value: data.files.filter((item) => item.status === "published").length, hint: "متاحة للزوار", icon: "▣" },
-      ].map((item) => <article key={item.label} className="rounded-2xl border border-white/10 bg-[#17211c] p-5">
-        <div className="flex items-center justify-between"><span className="text-sm text-stone-400">{item.label}</span><span className="grid size-9 place-items-center rounded-xl bg-[#273c31] text-lg text-[#c0dec2]">{item.icon}</span></div>
-        <p className="mt-5 text-3xl font-semibold tabular-nums">{loading ? "—" : item.value}</p><p className="mt-2 text-xs text-stone-500">{item.hint}</p>
-      </article>)}
+        { label: "القضايا المنشورة", value: data.totals.cases, hint: `${data.pending.cases} تنتظر المراجعة`, icon: "◈" },
+        { label: "الملفات المنشورة", value: data.totals.files, hint: `${data.pending.files} تنتظر المراجعة`, icon: "▤" },
+        { label: "الشهادات المنشورة", value: data.totals.testimonies, hint: `${data.pending.testimonies} تنتظر المراجعة`, icon: "▧" },
+        { label: "طلبات التوثيق", value: data.pending.requests, hint: "طلبات تنتظر القرار", icon: "✓", href: "/admin/verification" },
+      ].map((item) => <Link href={"href" in item && item.href ? item.href : "/admin/archive"} key={item.label} className="rounded-2xl border border-white/10 bg-[#17211c] p-3 transition hover:border-[#c0dec2]/30 sm:p-4">
+        <div className="flex items-center justify-between gap-2"><span className="text-xs text-stone-400 sm:text-sm">{item.label}</span><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#273c31] text-base text-[#c0dec2]">{item.icon}</span></div>
+        <p className="mt-3 text-2xl font-semibold tabular-nums sm:text-3xl">{loading ? "—" : item.value}</p><p className="mt-1 text-[10px] text-stone-500 sm:text-xs">{item.hint}</p>
+      </Link>)}
+    </section>
+
+    <section className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs text-[#b69a6d]">من بيانات السجلات المنشورة</p><h2 className="mt-2 text-xl font-semibold">القضايا والملفات الموثقة حسب سنة الحدث</h2></div><p className="max-w-lg text-xs leading-6 text-stone-500">يعرض ما وثّقه الأرشيف بحسب تاريخ الحدث، ولا يقيس وحده شدة الانتهاكات؛ إذ يتأثر بتفاوت التوثيق والتغطية.</p></div>
+      <YearlyArchiveChart rows={data.yearlyStats} loading={loading} />
     </section>
 
     <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
       <section id="verification" className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3"><div><p className="text-xs text-[#b69a6d]">متابعة المراجعة</p><h2 className="mt-2 text-xl font-semibold">طلبات التوثيق والمحتوى الجديد</h2></div><span className="rounded-full bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">{data.pending.requests + pendingSubmissions} بانتظار الإجراء</span></div>
+        <div className="flex items-start justify-between gap-3"><div><p className="text-xs text-[#b69a6d]">متابعة المراجعة</p><h2 className="mt-2 text-xl font-semibold">طلبات التوثيق والمحتوى الجديد</h2></div><Link href="/admin/verification" className="rounded-full bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">{data.pending.requests + pendingSubmissions} بانتظار الإجراء · التفاصيل ←</Link></div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {[
             ["طلبات التوثيق", data.pending.requests],
@@ -191,13 +201,20 @@ export default function AdminDashboardPage() {
         <div className="mt-5 grid gap-3">
           <ModuleCard title="المقالات" description={`${data.totals.articles} مقال محفوظ`} state="يبدأ بعد تجهيز محرر المقالات" />
           {isOwner && <>
-            <ModuleCard title="مراسلات المشتركين" description="إرسال رسائل للمسجلين في المنصة" state="يتطلب ربط خدمة البريد" />
-            <ModuleCard title="الإشعارات العامة" description="نشر تنبيه يظهر لمستخدمي الموقع" state="سيكون للمالك فقط" />
+            <Link href="/admin/messages" className="block"><ModuleCard title="الرسائل" description="محادثات الدعم الواردة من المستخدمين" state="فتح صندوق الوارد" /></Link>
+            <Link href="/admin/notifications" className="block"><ModuleCard title="الإشعارات العامة" description="معاينة وبث تنبيه لمستخدمي الموقع" state="المالك فقط" /></Link>
           </>}
         </div>
         <div className="mt-5 rounded-xl border border-[#a58c62]/20 bg-[#8e7448]/10 p-4 text-xs leading-6 text-stone-300"><strong className="text-[#e1c995]">مراجعة الذكاء الاصطناعي غير مفعّلة بعد.</strong> لذلك لم يُضف زر نشر للمحررين؛ قاعدة البيانات لن تسمح بنشر محتواهم قبل ربط المراجعة فعلياً.</div>
       </section>
     </div>
+
+    <section className="grid gap-5 xl:grid-cols-2">
+      <RecentArchive title="أحدث القضايا" href="/admin/archive" rows={data.cases.filter((item) => item.status === "published").slice(0, 5).map((item) => ({ id: item.id, title: item.title, date: item.created_at }))} loading={loading} />
+      <RecentArchive title="أحدث الملفات" href="/admin/archive?kind=files" rows={data.files.filter((item) => item.status === "published").slice(0, 5).map((item) => ({ id: item.id, title: item.title, date: item.created_at }))} loading={loading} />
+    </section>
+    <DashboardRecentTestimonies />
+    <DashboardInboxPreview isOwner={isOwner} />
 
     <section id="case-review" className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -245,4 +262,70 @@ function fileHasCase(file: PersonFile, caseId: string, links: FileCaseLink[]) {
 function fileCaseNames(file: PersonFile, links: FileCaseLink[], cases: CaseSubmission[]) {
   const ids = new Set([...(file.case_id ? [file.case_id] : []), ...links.filter((link) => link.person_file_id === file.id).map((link) => link.case_id)]);
   return [...ids].map((id) => cases.find((item) => item.id === id)?.title).filter((title): title is string => Boolean(title));
+}
+
+function YearlyArchiveChart({ rows, loading }: { rows: YearStat[]; loading: boolean }) {
+  const points = rows.slice(-12);
+  const max = Math.max(1, ...points.flatMap((row) => [row.cases, row.files]));
+  return <div className="mt-5">
+    <div className="mb-2 flex flex-wrap gap-4 text-xs"><span className="flex items-center gap-2"><i className="size-2 rounded-full bg-[#c0dec2]"/>القضايا</span><span className="flex items-center gap-2"><i className="size-2 rounded-full bg-[#c6a56a]"/>الملفات المرتبطة بقضايا</span></div>
+    {loading ? <p className="py-10 text-center text-sm text-stone-500">جارٍ تحميل الرسم…</p> : points.length === 0 ? <p className="py-10 text-center text-sm text-stone-500">لا توجد سجلات منشورة مؤرخة لعرضها.</p> : <><div className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:grid-cols-12">{points.map((row) => <div key={row.year} title={`${row.year}: ${row.cases} قضية، ${row.files} ملف`} className="flex flex-col items-center gap-2"><div className="flex h-36 w-full items-end justify-center gap-1 rounded-lg bg-black/10 px-2 pb-2"><div aria-label={`${row.cases} قضية`} className="w-3 rounded-t bg-[#c0dec2]" style={{ height: row.cases ? `${Math.max(3, row.cases / max * 100)}%` : "0%" }} /><div aria-label={`${row.files} ملف`} className="w-3 rounded-t bg-[#c6a56a]" style={{ height: row.files ? `${Math.max(3, row.files / max * 100)}%` : "0%" }} /></div><span className="text-[10px] text-stone-400">{row.year}</span><span className="text-[9px] text-stone-500">ق {row.cases} · م {row.files}</span></div>)}</div><p className="mt-3 text-[10px] leading-5 text-stone-500">تُحسب الملفات المرتبطة ضمن سنة القضية التي ترتبط بها؛ ولا تظهر السجلات التي لا تحمل تاريخ حدث معروفاً.</p></>}
+  </div>;
+}
+
+function RecentArchive({ title, href, rows, loading }: { title: string; href: string; rows: Array<{ id: string; title: string; date: string }>; loading: boolean }) {
+  return <section className="rounded-2xl border border-white/10 bg-[#17211c] p-5"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{title}</h2><Link href={href} className="text-xs text-[#c0dec2] underline">عرض الكل</Link></div>{loading ? <p className="mt-4 text-sm text-stone-500">جارٍ التحميل…</p> : rows.length === 0 ? <p className="mt-4 text-sm text-stone-500">لا توجد عناصر منشورة.</p> : <ul className="mt-3 divide-y divide-white/8">{rows.map((row) => <li key={row.id} className="flex justify-between gap-4 py-3 text-sm"><span>{row.title}</span><time className="shrink-0 text-[10px] text-stone-500">{dateFormatter.format(new Date(row.date))}</time></li>)}</ul>}</section>;
+}
+
+function DashboardInboxPreview({ isOwner }: { isOwner: boolean }) {
+  const [items, setItems] = useState<Array<{ id: string; subject: string; preview: string; date: string }>>([]);
+  const [unread, setUnread] = useState(0);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    if (!supabase || !isOwner) { setLoading(false); return; }
+    let alive = true;
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { if (alive) setLoading(false); return; }
+      const [{ data: threads }, { data: memberships }] = await Promise.all([
+        supabase.from("sijill_conversations").select("id,subject,updated_at").order("updated_at", { ascending: false }).limit(500),
+        supabase.from("sijill_conversation_members").select("conversation_id,last_read_at").eq("user_id", user.id),
+      ]);
+      const ids = (threads ?? []).map((thread) => thread.id);
+      const { data: recentMessages } = ids.length ? await supabase.from("sijill_direct_messages").select("id,conversation_id,sender_id,body,created_at").in("conversation_id", ids).order("created_at", { ascending: false }).limit(1000) : { data: [] };
+      if (!alive) return;
+      const seen = new Map((memberships ?? []).map((row) => [row.conversation_id, row.last_read_at ? new Date(row.last_read_at).getTime() : 0]));
+      const messages = recentMessages ?? [];
+      setUnread(messages.filter((message) => message.sender_id !== user.id && new Date(message.created_at).getTime() > (seen.get(message.conversation_id) ?? 0)).length);
+      setItems((threads ?? []).slice(0, 5).map((thread) => {
+        const latest = messages.find((message) => message.conversation_id === thread.id);
+        return { id: thread.id, subject: thread.subject, preview: latest?.body ?? "لا توجد رسالة بعد", date: latest?.created_at ?? thread.updated_at };
+      }));
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [isOwner]);
+  if (!isOwner) return null;
+  return <section className="rounded-2xl border border-white/10 bg-[#17211c] p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs text-[#b69a6d]">الوارد</p><h2 className="mt-1 text-lg font-semibold">رسائل المستخدمين</h2></div><Link href="/admin/messages" className="rounded-full border border-white/15 px-3 py-1.5 text-xs">{unread} غير مقروءة · فتح الصندوق ←</Link></div>{loading ? <p className="mt-4 text-sm text-stone-500">جارٍ تحميل الوارد…</p> : items.length === 0 ? <p className="mt-4 text-sm text-stone-500">لا توجد مراسلات دعم واردة.</p> : <ul className="mt-3 divide-y divide-white/8">{items.map((item) => <li key={item.id} className="flex flex-wrap justify-between gap-2 py-3"><div><p className="text-sm font-medium">{item.subject}</p><p className="mt-1 line-clamp-1 text-xs text-stone-400">{item.preview}</p></div><time className="text-[10px] text-stone-500">{dateFormatter.format(new Date(item.date))}</time></li>)}</ul>}</section>;
+}
+
+function DashboardRecentTestimonies() {
+  const [rows, setRows] = useState<Array<{ id: string; title: string; created_at: string; author: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient(); if (!supabase) return;
+    let alive = true;
+    void (async () => {
+      const { data } = await supabase.from("sijill_testimonies").select("id,title,created_at,created_by").eq("status", "published").order("created_at", { ascending: false }).limit(5);
+      const ids = [...new Set((data ?? []).map((row) => row.created_by).filter((id): id is string => Boolean(id)))];
+      const { data: people } = ids.length ? await supabase.from("sijill_public_profiles").select("user_id,display_name").in("user_id", ids) : { data: [] };
+      if (!alive) return;
+      const names = new Map((people ?? []).map((row) => [row.user_id, row.display_name]));
+      setRows((data ?? []).map((row) => ({ id: row.id, title: row.title, created_at: row.created_at, author: names.get(row.created_by) ?? "مستخدم سِجِلّ" })));
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, []);
+  return <RecentArchive title="أحدث الشهادات" href="/admin/archive?kind=testimonies" rows={rows.map((row) => ({ id: row.id, title: `${row.title} · ${row.author}`, date: row.created_at }))} loading={loading}/>;
 }

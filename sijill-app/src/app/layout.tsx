@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { SiteMenu } from "@/components/site-menu";
+import { SiteBackground } from "@/components/site-background";
+import { BroadcastNotice } from "@/components/broadcast-notice";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +18,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body><SiteMenu />{children}</body>
+      <body><SiteBackground /><BroadcastNotice /><SiteMenu />{children}</body>
     </html>
   );
 }

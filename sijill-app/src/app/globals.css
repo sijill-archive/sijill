@@ -12,11 +12,26 @@
   }
 
   body {
-    @apply m-0 bg-[#f8f7f2] text-stone-900 dark:bg-[#151916] dark:text-stone-100;
+    @apply m-0 text-stone-900 dark:text-stone-100;
+    background-color: var(--site-background, #f8f7f2);
   }
 
   ::selection {
     @apply bg-orange-200 text-emerald-950;
+  }
+}
+
+@media print {
+  @page { margin: 16mm; }
+  body, body * { background: transparent !important; color: #111 !important; box-shadow: none !important; }
+  body { background: #fff !important; }
+  aside, nav, header, button, form, select, main > a, main > section > label { display: none !important; }
+  main > section { display: block !important; border: 0 !important; padding: 0 !important; }
+}
+
+@media (prefers-color-scheme: dark) {
+  @layer base {
+    body { background-color: var(--site-background, #151916); }
   }
 }
 

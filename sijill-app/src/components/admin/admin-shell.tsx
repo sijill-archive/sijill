@@ -11,8 +11,15 @@ type StaffRole = "owner" | "editor";
 
 const staffItems = [
   { label: "لوحة التحكم", href: "/admin", icon: "⌂" },
-  { label: "طلبات التوثيق", href: "/admin#verification", icon: "✓" },
-  { label: "المقالات", href: "/admin#articles", icon: "▤" },
+  { label: "طلبات التوثيق", href: "/admin/verification", icon: "✓" },
+  { label: "القضايا والملفات", href: "/admin/archive", icon: "▤" },
+  { label: "التقارير", href: "/admin/reports", icon: "▧" },
+  { label: "الرسائل", href: "/admin/messages", icon: "✉" },
+];
+
+const ownerItems = [
+  { label: "الإشعارات", href: "/admin/notifications", icon: "◉" },
+  { label: "الإعدادات", href: "/admin/settings", icon: "⚙" },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -86,14 +93,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <nav className="mt-3 grid gap-1" aria-label="أقسام لوحة الإدارة">
         {staffItems.map((item) => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${pathname === item.href ? "bg-[#243b30] text-[#d8ebd6]" : "text-stone-300 hover:bg-white/5"}`}><span className="grid size-7 place-items-center rounded-lg bg-white/5 text-base">{item.icon}</span>{item.label}</Link>)}
       </nav>
-      {role === "owner" && <>
-        <p className="mt-8 px-3 text-[10px] font-semibold tracking-[.2em] text-stone-500">للمالك</p>
-        <div className="mt-3 grid gap-1">
-          <span className="rounded-xl px-3 py-3 text-sm text-stone-500">مراسلات المشتركين · قريباً</span>
-          <span className="rounded-xl px-3 py-3 text-sm text-stone-500">الإشعارات العامة · قريباً</span>
-          <span className="rounded-xl px-3 py-3 text-sm text-stone-500">سجل الحركات · في لوحة التحكم</span>
-        </div>
-      </>}
+      {role === "owner" && <><p className="mt-8 px-3 text-[10px] font-semibold tracking-[.2em] text-stone-500">للمالك فقط</p><nav className="mt-3 grid gap-1" aria-label="إعدادات المالك">{ownerItems.map((item) => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${pathname === item.href ? "bg-[#243b30] text-[#d8ebd6]" : "text-stone-300 hover:bg-white/5"}`}><span className="grid size-7 place-items-center rounded-lg bg-white/5 text-base">{item.icon}</span>{item.label}</Link>)}</nav></>}
       <div className="mt-auto border-t border-white/10 pt-4">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-stone-300"><i className="size-1.5 rounded-full bg-emerald-400" />{role === "owner" ? "المالك" : "محرر"}</span>
         <Link href="/" className="mt-3 block rounded-xl px-3 py-2 text-sm text-stone-400 hover:bg-white/5 hover:text-white">← العودة إلى الموقع</Link>
@@ -101,11 +101,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </div>
     </aside>
     <div className="lg:mr-64">
-      <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-white/10 bg-[#101714]/90 px-5 backdrop-blur sm:px-8">
+      <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between border-b border-white/10 bg-[#101714]/90 px-5 backdrop-blur sm:px-8">
         <div className="flex items-center gap-3 lg:hidden"><BrandLogo tone="white" className="h-9 w-9" /><span className="text-sm font-semibold">لوحة إدارة سِجِلّ</span></div>
-        <div className="hidden text-sm text-stone-400 lg:block">الإدارة <span className="mx-2 text-stone-600">/</span> {pathname === "/admin" ? "لوحة التحكم" : "المراجعة"}</div>
+        <div className="hidden text-sm text-stone-400 lg:block">الإدارة <span className="mx-2 text-stone-600">/</span> {pathname === "/admin" ? "لوحة التحكم" : [...staffItems, ...ownerItems].find((item) => item.href === pathname)?.label ?? "الإدارة"}</div>
         <span className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-stone-300 lg:mr-auto">{role === "owner" ? "حساب المالك" : "حساب محرر"}</span>
         <Link href="/" className="mr-3 text-xs text-[#c0dec2] underline underline-offset-4 lg:hidden">الموقع</Link>
+        <nav aria-label="التنقل في الإدارة" className="order-3 flex w-full gap-2 overflow-x-auto pb-2 lg:hidden">{[...staffItems, ...(role === "owner" ? ownerItems : [])].map((item) => <Link key={item.href} href={item.href} className={`shrink-0 rounded-lg border px-3 py-2 text-xs ${pathname === item.href ? "border-[#c0dec2]/40 bg-[#243b30] text-[#d8ebd6]" : "border-white/10 text-stone-300"}`}>{item.label}</Link>)}</nav>
       </header>
       <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10">{children}</main>
     </div>
