@@ -50,6 +50,11 @@ export function AdminSection({ section }: { section: Section }) {
   const [dateTo, setDateTo] = useState("");
   const [reportTarget, setReportTarget] = useState("");
   const [background, setBackground] = useState("#151916");
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState("");
+  const [backgroundImagePath, setBackgroundImagePath] = useState("");
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [backgroundPreview, setBackgroundPreview] = useState("");
+  const [removeBackgroundImage, setRemoveBackgroundImage] = useState(false);
 
   useEffect(() => {
     if (!supabase) { setError("إعداد Supabase غير متوفر."); return; }
@@ -108,12 +113,19 @@ export function AdminSection({ section }: { section: Section }) {
         if (alive) { if (result.error) setError("تعذر فتح صندوق الرسائل."); else setConversations((result.data ?? []) as Conversation[]); setProfiles((profileResult.data ?? []) as AdminProfile[]); setConversationMembers((memberResult.data ?? []) as ConversationMember[]); }
       }
       if (section === "settings" && owner) {
-        const result = await supabase.from("sijill_site_settings").select("background_color").eq("singleton", true).maybeSingle();
-        if (alive && result.data) setBackground(result.data.background_color);
+        const result = await supabase.from("sijill_site_settings").select("background_color,background_image_url,background_image_path").eq("singleton", true).maybeSingle();
+        if (alive && result.data) { setBackground(result.data.background_color); setBackgroundImageUrl(result.data.background_image_url ?? ""); setBackgroundImagePath(result.data.background_image_path ?? ""); }
       }
     })();
     return () => { alive = false; };
   }, [section]);
+
+  useEffect(() => {
+    if (!backgroundFile) { setBackgroundPreview(""); return; }
+    const url = URL.createObjectURL(backgroundFile);
+    setBackgroundPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [backgroundFile]);
 
   useEffect(() => { if (typeof window !== "undefined") { const kind = new URLSearchParams(window.location.search).get("kind"); if (kind === "files") setTypeFilter("person_file"); else if (kind === "testimonies") setTypeFilter("testimony"); } }, []);
   useEffect(() => {
@@ -219,20 +231,49 @@ export function AdminSection({ section }: { section: Section }) {
   const publishNotification = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!supabase || !isOwner) return;
     const form = event.currentTarget; const values = new FormData(form); const title = String(values.get("title") ?? "").trim(); const body = String(values.get("body") ?? "").trim();
-    if (!title || !body || !window.confirm(`معاينة البث العام:\n\n${title}\n\n${body}\n\nسيظهر لجميع زوار الموقع. نشر الإشعار الآن؟`)) return;
+    if (!title || !body || !window.confirm(`معاينة الإشعار:\n\n${title}\n\n${body}\n\nسيظهر للمستخدمين المسجلين فقط، ويصل كإشعار للجهازين الذين فعّلوا إشعارات الخلفية. نشره الآن؟`)) return;
     setBusy(true); const { data: { user } } = await supabase.auth.getUser();
-    const { error: publishError } = await supabase.from("sijill_broadcast_notifications").insert({ title, body, status: "published", created_by: user?.id, published_at: new Date().toISOString() });
-    if (publishError) setError("تعذر نشر الإشعار."); else { form.reset(); setNotice("تم نشر الإشعار العام."); }
+    const { data: published, error: publishError } = await supabase.from("sijill_broadcast_notifications").insert({ title, body, status: "published", created_by: user?.id, published_at: new Date().toISOString() }).select("id").single();
+    if (publishError || !published) setError("تعذر نشر الإشعار."); else {
+      form.reset();
+      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const pushResponse = await fetch("/api/push/send", { method: "POST", headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) }, body: JSON.stringify({ notificationId: published.id }) });
+        const pushResult = await pushResponse.json().catch(() => ({})) as { sent?: number; error?: string };
+        if (pushResponse.status === 503) setNotice("نُشر للمستخدمين المسجلين. لإيصال الإشعار عند إغلاق الموقع، أضف مفاتيح VAPID إلى إعدادات Vercel.");
+        else if (pushResponse.ok && pushResult.sent === 0) setNotice("نُشر للمستخدمين المسجلين. لا توجد أجهزة فعّلت إشعارات الخلفية بعد.");
+        else if (!pushResponse.ok) setNotice("نُشر للمستخدمين المسجلين، لكن تعذر إرسال إشعارات الخلفية الآن.");
+        else setNotice(`نُشر للمستخدمين المسجلين، وأُرسل إلى ${pushResult.sent ?? 0} جهازاً مفعّلاً.`);
+      } catch { setNotice("نُشر للمستخدمين المسجلين. تعذر الاتصال بخدمة إشعارات الخلفية."); }
+    }
     setBusy(false);
   };
 
   const saveSettings = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!supabase || !isOwner) return;
-    const values = new FormData(event.currentTarget); const color = String(values.get("background") ?? background);
+    const form = event.currentTarget;
+    const values = new FormData(form); const color = String(values.get("background") ?? background);
     if (!/^#[0-9a-fA-F]{6}$/.test(color)) { setError("اختر لوناً صالحاً."); return; }
-    setBusy(true); const { data: { user } } = await supabase.auth.getUser();
-    const { error: saveError } = await supabase.from("sijill_site_settings").upsert({ singleton: true, background_color: color, updated_by: user?.id, updated_at: new Date().toISOString() });
-    if (saveError) setError("تعذر حفظ اللون. تأكد من تطبيق ترحيل إعدادات الموقع."); else { localStorage.setItem("sijill-site-background", color); document.documentElement.style.setProperty("--site-background", color); setNotice("تم حفظ خلفية الموقع وتطبيقها على هذا المتصفح."); }
+    if (backgroundFile && (!/^image\/(jpeg|png|webp)$/.test(backgroundFile.type) || backgroundFile.size > 10 * 1024 * 1024)) { setError("ارفع صورة JPG أو PNG أو WebP لا يتجاوز حجمها 10 ميغابايت."); return; }
+    setBusy(true); setError(""); const { data: { user } } = await supabase.auth.getUser();
+    let imageUrl = removeBackgroundImage ? "" : backgroundImageUrl;
+    let imagePath = removeBackgroundImage ? null : (backgroundImagePath || null);
+    if (backgroundFile) {
+      const extension = backgroundFile.type === "image/png" ? "png" : backgroundFile.type === "image/webp" ? "webp" : "jpg";
+      imagePath = `site/background.${extension}`;
+      const { error: uploadError } = await supabase.storage.from("sijill-site-backgrounds").upload(imagePath, backgroundFile, { upsert: true, contentType: backgroundFile.type, cacheControl: "60" });
+      if (uploadError) { setError("تعذر رفع الصورة. تأكد من تطبيق ترحيل خلفية الموقع."); setBusy(false); return; }
+      imageUrl = supabase.storage.from("sijill-site-backgrounds").getPublicUrl(imagePath).data.publicUrl;
+    }
+    const { error: saveError } = await supabase.from("sijill_site_settings").upsert({ singleton: true, background_color: color, background_image_url: imageUrl || null, background_image_path: imagePath, updated_by: user?.id, updated_at: new Date().toISOString() });
+    if (saveError) setError("تعذر حفظ الخلفية. تأكد من تطبيق ترحيل إعدادات الموقع."); else {
+      setBackgroundImageUrl(imageUrl); setBackgroundImagePath(imagePath ?? ""); setBackgroundFile(null); setRemoveBackgroundImage(false);
+      localStorage.setItem("sijill-site-background", color);
+      if (imageUrl) localStorage.setItem("sijill-site-background-image", imageUrl); else localStorage.removeItem("sijill-site-background-image");
+      document.documentElement.style.setProperty("--site-background", color);
+      document.documentElement.style.setProperty("--site-background-image", imageUrl ? `url("${imageUrl}")` : "none");
+      setNotice("تم حفظ خلفية الموقع وتطبيقها على جميع الصفحات.");
+    }
     setBusy(false);
   };
 
@@ -285,9 +326,9 @@ export function AdminSection({ section }: { section: Section }) {
       {!isOwner ? <p className="lg:col-span-2 text-sm text-stone-400">صندوق مراسلات الإدارة مخصص للمالك.</p> : <><div><h2 className="font-semibold">صندوق الرسائل</h2><form onSubmit={(e) => void startDirectConversation(e)} className="mt-4 space-y-2 rounded-xl border border-white/10 p-3"><label className="block text-xs text-stone-400">مراسلة مستخدم مسجل<select required name="recipient" defaultValue="" className={`${field} mt-2`}><option value="" disabled>اختر المستخدم</option>{profiles.filter((profile) => profile.user_id !== ownerId).map((profile) => <option key={profile.user_id} value={profile.user_id}>{profile.display_name}</option>)}</select></label><input required name="subject" maxLength={180} placeholder="موضوع المحادثة" className={field}/><button disabled={busy} className="w-full rounded-lg border border-[#c0dec2]/30 px-3 py-2 text-xs text-[#c0dec2]">بدء محادثة</button></form><ul className="mt-4 space-y-2">{conversations.map((item) => { const peerId = conversationMembers.find((member) => member.conversation_id === item.id && member.user_id !== ownerId)?.user_id; return <li key={item.id}><button onClick={() => setSelectedConversation(item.id)} className={`w-full rounded-xl border p-3 text-right ${selectedConversation === item.id ? "border-[#c0dec2]/50 bg-white/5" : "border-white/10"}`}><span className="block text-sm font-medium">{profileName(peerId)} · {item.subject}</span><span className="mt-1 block text-[10px] text-stone-500">{item.kind === "support" ? "مراسلة واردة" : "محادثة مباشرة"} · {dateFormat.format(new Date(item.updated_at))}</span></button></li>; })}</ul>{conversations.length === 0 && <p className="mt-5 text-sm text-stone-500">لا توجد مراسلات بعد.</p>}</div><div className="flex min-h-[400px] flex-col rounded-xl border border-white/10 p-4"><h2 className="border-b border-white/10 pb-3 font-semibold">{conversations.find((item) => item.id === selectedConversation)?.subject ?? "اختر محادثة"} {conversationMembers.find((member) => member.conversation_id === selectedConversation && member.user_id !== ownerId) && <span className="text-xs text-stone-400">· {profileName(conversationMembers.find((member) => member.conversation_id === selectedConversation && member.user_id !== ownerId)?.user_id)}</span>}</h2><div className="flex-1 space-y-3 overflow-y-auto py-4">{messages.map((item) => <div key={item.id} className={`max-w-[85%] rounded-xl p-3 text-sm leading-7 ${item.sender_id === ownerId ? "mr-auto bg-emerald-950/50" : "ml-auto bg-white/5"}`}><p>{item.body}</p><time className="mt-2 block text-[10px] text-stone-500">{dateFormat.format(new Date(item.created_at))}</time></div>)}</div>{selectedConversation && <form onSubmit={(e) => void sendReply(e)} className="flex gap-2 border-t border-white/10 pt-3"><textarea name="body" required maxLength={10000} rows={2} placeholder="اكتب الرد" className={`${field} flex-1`}/><button disabled={busy} className="rounded-lg bg-[#c0dec2] px-4 text-sm font-semibold text-[#14251d]">إرسال</button></form>}</div></>}
     </section>}
 
-    {section === "notifications" && <section className={panel}>{!isOwner ? <p className="text-sm text-stone-400">إرسال الإشعارات العامة متاح للمالك فقط.</p> : <><form onSubmit={(e) => void publishNotification(e)} className="space-y-4"><label className="block text-sm">عنوان الإشعار<input required name="title" maxLength={180} className={`${field} mt-2`}/></label><label className="block text-sm">نص الإشعار<textarea required name="body" maxLength={5000} rows={5} className={`${field} mt-2`}/></label><p className="rounded-lg border border-amber-400/20 bg-amber-950/20 p-3 text-xs leading-6 text-amber-100">لن يُبث حتى توافق على المعاينة النهائية. الإشعار المنشور يظهر في واجهة الموقع للمستخدمين.</p><button disabled={busy} className="rounded-xl bg-[#c0dec2] px-5 py-3 text-sm font-semibold text-[#14251d]">معاينة ثم بث</button></form></>}</section>}
+    {section === "notifications" && <section className={panel}>{!isOwner ? <p className="text-sm text-stone-400">إرسال الإشعارات العامة متاح للمالك فقط.</p> : <><form onSubmit={(e) => void publishNotification(e)} className="space-y-4"><label className="block text-sm">عنوان الإشعار<input required name="title" maxLength={180} className={`${field} mt-2`}/></label><label className="block text-sm">نص الإشعار<textarea required name="body" maxLength={5000} rows={5} className={`${field} mt-2`}/></label><p className="rounded-lg border border-amber-400/20 bg-amber-950/20 p-3 text-xs leading-6 text-amber-100">تظهر الإشعارات للمستخدمين المسجلين فقط. ويمكن لمن فعّل إشعارات الجهاز استلامها في الخلفية حتى عند إغلاق صفحة الموقع، بعد ضبط مفاتيح الإرسال.</p><button disabled={busy} className="rounded-xl bg-[#c0dec2] px-5 py-3 text-sm font-semibold text-[#14251d]">معاينة ثم بث</button></form></>}</section>}
 
-    {section === "settings" && <div className="grid gap-5 xl:grid-cols-2">{!isOwner ? <section className={panel}><p className="text-sm text-stone-400">إعدادات الموقع متاحة للمالك فقط.</p></section> : <><section className={panel}><h2 className="text-lg font-semibold">خلفية الموقع</h2><p className="mt-2 text-xs leading-6 text-stone-500">غيّر لون الخلفية العامة بعد مشاهدة المعاينة.</p><form onSubmit={(e) => void saveSettings(e)} className="mt-5 space-y-4"><label className="block text-sm">اللون<input name="background" type="color" value={background} onChange={(e) => setBackground(e.target.value)} className="mt-2 h-12 w-full rounded-lg border border-white/10 bg-transparent p-1"/></label><div className="rounded-xl border border-white/10 p-5" style={{ backgroundColor: background }}>معاينة خلفية الموقع · سِجِلّ</div><button disabled={busy} className="rounded-lg bg-[#c0dec2] px-4 py-2 text-sm font-semibold text-[#14251d]">حفظ الخلفية</button></form></section><section className={`${panel} space-y-7`}><div><h2 className="text-lg font-semibold">كلمة مرور حساب المالك</h2><form onSubmit={(e) => void changeOwnPassword(e)} className="mt-4 space-y-3"><input required name="password" type="password" minLength={8} autoComplete="new-password" placeholder="كلمة مرور جديدة" className={field}/><button disabled={busy} className="rounded-lg border border-white/15 px-4 py-2 text-sm">تغيير كلمة مروري</button></form></div><div className="border-t border-white/10 pt-5"><h2 className="text-lg font-semibold">إرسال رابط استعادة لمستخدم</h2><p className="mt-2 text-xs leading-6 text-stone-500">يُرسل Supabase رابطاً رسمياً إلى المستخدم. لا يطّلع المشرف على كلمة المرور ولا يحددها عنه.</p><form onSubmit={(e) => void resetPassword(e)} className="mt-4 flex flex-col gap-3 sm:flex-row"><input required name="email" type="email" placeholder="بريد المستخدم المسجل" className={`${field} flex-1`}/><button disabled={busy} className="rounded-lg border border-white/15 px-4 py-2 text-sm">إرسال رابط الاستعادة</button></form></div></section></>}</div>}
+    {section === "settings" && <div className="grid gap-5 xl:grid-cols-2">{!isOwner ? <section className={panel}><p className="text-sm text-stone-400">إعدادات الموقع متاحة للمالك فقط.</p></section> : <><section className={panel}><h2 className="text-lg font-semibold">خلفية الموقع</h2><p className="mt-2 text-xs leading-6 text-stone-500">ارفع صورة أو اختر لوناً. المقاس الموصى به 1920 × 1080 بكسل (16:9)، والحد الأعلى 10 ميغابايت. تُعرض الصورة مع تغبيش ثابت وطبقة تعتيم بنسبة 30٪ للمحافظة على وضوح المحتوى.</p><form onSubmit={(e) => void saveSettings(e)} className="mt-5 space-y-4"><label className="block text-sm">صورة الخلفية (JPG أو PNG أو WebP)<input name="background-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { setBackgroundFile(e.target.files?.[0] ?? null); setRemoveBackgroundImage(false); }} className={`${field} mt-2 file:ml-3 file:rounded-lg file:border-0 file:bg-[#c0dec2] file:px-3 file:py-2 file:text-[#14251d]`}/></label>{(backgroundImageUrl || backgroundPreview) && <button type="button" onClick={() => { setBackgroundFile(null); setBackgroundImageUrl(""); setBackgroundImagePath(""); setRemoveBackgroundImage(true); }} className="text-xs text-rose-200 underline">إزالة صورة الخلفية</button>}<label className="block text-sm">اللون الاحتياطي<input name="background" type="color" value={background} onChange={(e) => setBackground(e.target.value)} className="mt-2 h-12 w-full rounded-lg border border-white/10 bg-transparent p-1"/></label><div className="relative isolate flex min-h-40 items-center justify-center overflow-hidden rounded-xl border border-white/10 p-5 text-center"><div aria-hidden="true" className="absolute inset-[-8px] z-0 bg-cover bg-center blur-[6px]" style={{ backgroundColor: background, backgroundImage: !removeBackgroundImage && (backgroundPreview || backgroundImageUrl) ? `url("${backgroundPreview || backgroundImageUrl}")` : undefined }}/><div aria-hidden="true" className="absolute inset-0 z-0 bg-black/30"/><span className="relative z-10 text-lg font-bold drop-shadow">معاينة خلفية الموقع · سِجِلّ</span></div><button disabled={busy} className="rounded-lg bg-[#c0dec2] px-4 py-2 text-sm font-semibold text-[#14251d]">حفظ الخلفية</button></form></section><section className={`${panel} space-y-7`}><div><h2 className="text-lg font-semibold">كلمة مرور حساب المالك</h2><form onSubmit={(e) => void changeOwnPassword(e)} className="mt-4 space-y-3"><input required name="password" type="password" minLength={8} autoComplete="new-password" placeholder="كلمة مرور جديدة" className={field}/><button disabled={busy} className="rounded-lg border border-white/15 px-4 py-2 text-sm">تغيير كلمة مروري</button></form></div><div className="border-t border-white/10 pt-5"><h2 className="text-lg font-semibold">إرسال رابط استعادة لمستخدم</h2><p className="mt-2 text-xs leading-6 text-stone-500">يُرسل Supabase رابطاً رسمياً إلى المستخدم. لا يطّلع المشرف على كلمة المرور ولا يحددها عنه.</p><form onSubmit={(e) => void resetPassword(e)} className="mt-4 flex flex-col gap-3 sm:flex-row"><input required name="email" type="email" placeholder="بريد المستخدم المسجل" className={`${field} flex-1`}/><button disabled={busy} className="rounded-lg border border-white/15 px-4 py-2 text-sm">إرسال رابط الاستعادة</button></form></div></section></>}</div>}
     <Link href="/admin" className="inline-block text-xs text-[#c0dec2] underline">العودة إلى لوحة التحكم</Link>
   </main>;
 }

@@ -8,13 +8,19 @@ type Notice = { id: string; title: string; body: string; published_at: string | 
 const READ_KEY = "sijill-read-broadcasts";
 const LEGACY_DISMISSED_PREFIX = "sijill-dismissed-broadcast-";
 
-function readStoredIds() {
+function readStoredIds(userId = "") {
   try {
-    const saved = JSON.parse(localStorage.getItem(READ_KEY) ?? "[]") as unknown;
+    const saved = JSON.parse(localStorage.getItem(`${READ_KEY}:${userId}`) ?? "[]") as unknown;
     return new Set(Array.isArray(saved) ? saved.filter((item): item is string => typeof item === "string") : []);
   } catch {
     return new Set<string>();
   }
+}
+
+function decodeVapidKey(value: string) {
+  const padded = `${value}${"=".repeat((4 - value.length % 4) % 4)}`;
+  const decoded = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
 }
 
 function publishedLabel(value: string | null) {
@@ -27,17 +33,29 @@ export function BroadcastNotice() {
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const [activeNotice, setActiveNotice] = useState<Notice | null>(null);
   const [open, setOpen] = useState(false);
+  const [userId, setUserId] = useState("");
+  const [pushStatus, setPushStatus] = useState("");
+  const [pushBusy, setPushBusy] = useState(false);
   const reduceMotion = useReducedMotion();
   const readIdsRef = useRef(readIds);
   const knownIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    const ids = readStoredIds();
-    readIdsRef.current = ids;
-    setReadIds(ids);
+    const supabase = createBrowserSupabaseClient();
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data: { session } }) => setUserId(session?.user.id ?? ""));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUserId = session?.user.id ?? "";
+      knownIdsRef.current = null;
+      setUserId(nextUserId);
+      if (!nextUserId) { setNotices([]); setActiveNotice(null); setOpen(false); }
+    });
+    if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    return () => subscription.unsubscribe();
   }, []);
 
   const loadNotices = useCallback(async () => {
+    if (!userId) { setNotices([]); setActiveNotice(null); return; }
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     const supabase = createBrowserSupabaseClient();
     if (!supabase) return;
@@ -49,7 +67,7 @@ export function BroadcastNotice() {
     if (error || !data) return;
 
     const rows = data as Notice[];
-    const dismissed = readStoredIds();
+    const dismissed = readStoredIds(userId);
     rows.forEach((notice) => {
       if (localStorage.getItem(`${LEGACY_DISMISSED_PREFIX}${notice.id}`) === "yes") dismissed.add(notice.id);
     });
@@ -60,14 +78,13 @@ export function BroadcastNotice() {
     const known = knownIdsRef.current;
     if (known === null) {
       knownIdsRef.current = new Set(rows.map((notice) => notice.id));
-      setActiveNotice(rows.find((notice) => !dismissed.has(notice.id)) ?? null);
     } else {
       const fresh = rows.filter((notice) => !known.has(notice.id));
       rows.forEach((notice) => known.add(notice.id));
       const latestFresh = fresh.find((notice) => !dismissed.has(notice.id));
       if (latestFresh) setActiveNotice(latestFresh);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     void loadNotices();
@@ -85,7 +102,7 @@ export function BroadcastNotice() {
     next.add(id);
     readIdsRef.current = next;
     setReadIds(next);
-    localStorage.setItem(READ_KEY, JSON.stringify([...next]));
+    localStorage.setItem(`${READ_KEY}:${userId}`, JSON.stringify([...next]));
     localStorage.setItem(`${LEGACY_DISMISSED_PREFIX}${id}`, "yes");
   };
 
@@ -94,7 +111,43 @@ export function BroadcastNotice() {
     setActiveNotice((current) => current?.id === notice.id ? null : current);
   };
 
+  const enablePush = async () => {
+    if (!userId || pushBusy) return;
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("هذا المتصفح لا يدعم إشعارات الخلفية.");
+      return;
+    }
+    setPushBusy(true); setPushStatus("");
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { data: { session } } = await supabase?.auth.getSession() ?? { data: { session: null } };
+      if (!session) { setPushStatus("سجّل الدخول أولاً لتفعيل الإشعارات."); return; }
+      const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+      if (permission !== "granted") { setPushStatus("اسمح بالإشعارات من إعدادات الموقع في المتصفح ثم حاول مجدداً."); return; }
+      const keyResponse = await fetch("/api/push/vapid-public-key", { cache: "no-store" });
+      if (!keyResponse.ok) { setPushStatus("إشعارات الخلفية تحتاج إعداد مفاتيح الإرسال على Vercel."); return; }
+      const { publicKey } = await keyResponse.json() as { publicKey: string };
+      const registration = await navigator.serviceWorker.ready;
+      const pushManager = registration.pushManager;
+      const pushSubscription = await pushManager.getSubscription() ?? await pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: decodeVapidKey(publicKey),
+      });
+      const saveResponse = await fetch("/api/push/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ endpoint: pushSubscription.endpoint, subscription: pushSubscription.toJSON() }),
+      });
+      if (!saveResponse.ok) throw new Error("save-subscription-failed");
+      setPushStatus("تم تفعيل إشعارات الجهاز لهذا الحساب.");
+    } catch {
+      setPushStatus("تعذر تفعيل إشعارات الخلفية. تحقق من اتصالك ثم أعد المحاولة.");
+    } finally { setPushBusy(false); }
+  };
+
   const unreadCount = notices.reduce((count, notice) => count + (readIds.has(notice.id) ? 0 : 1), 0);
+
+  if (!userId) return null;
 
   return <>
     <div className="fixed left-5 top-[4.75rem] z-[52]" dir="rtl">
@@ -137,6 +190,11 @@ export function BroadcastNotice() {
               <div><h2 className="font-bold">إشعارات سِجِلّ</h2><p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">{unreadCount ? `${new Intl.NumberFormat("ar").format(unreadCount)} غير مقروء` : "كل الإشعارات مقروءة"}</p></div>
               <button type="button" onClick={() => setOpen(false)} aria-label="إغلاق" className="grid size-8 place-items-center rounded-full text-lg text-stone-500 hover:bg-black/5 dark:hover:bg-white/10">×</button>
             </header>
+            <div className="border-b border-stone-200 px-4 py-3 dark:border-white/10">
+              <button type="button" disabled={pushBusy} onClick={() => void enablePush()} className="w-full rounded-lg bg-[#c0dec2] px-3 py-2 text-sm font-semibold text-[#14251d] disabled:opacity-60">{pushBusy ? "جارٍ التفعيل…" : "تفعيل إشعارات الجهاز"}</button>
+              <p className="mt-2 text-xs leading-5 text-stone-500 dark:text-stone-400">تصلك الإشعارات على هذا الجهاز حتى عند إغلاق صفحة الموقع، إذا سمح المتصفح والنظام بذلك.</p>
+              {pushStatus && <p role="status" className="mt-2 text-xs leading-5 text-emerald-800 dark:text-emerald-200">{pushStatus}</p>}
+            </div>
             <ul className="max-h-[min(65vh,28rem)] divide-y divide-stone-200 overflow-y-auto dark:divide-white/10">
               {notices.map((notice) => <li key={notice.id}>
                 <button type="button" onClick={() => { setActiveNotice(notice); setOpen(false); markRead(notice.id); }} className="block w-full px-4 py-3 text-right transition hover:bg-[#eee9dc] dark:hover:bg-white/5">

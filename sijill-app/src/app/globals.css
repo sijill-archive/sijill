@@ -13,7 +13,33 @@
 
   body {
     @apply m-0 text-stone-900 dark:text-stone-100;
+    position: relative;
+    isolation: isolate;
     background-color: var(--site-background, #f8f7f2);
+  }
+
+  .site-background-layer {
+    position: fixed;
+    z-index: -1;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .site-background-blur {
+    position: absolute;
+    inset: -8px;
+    background-color: var(--site-background, #f8f7f2);
+    background-image: var(--site-background-image, none);
+    background-position: center;
+    background-size: cover;
+    filter: blur(6px);
+  }
+
+  .site-background-shade {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 30%);
   }
 
   ::selection {
