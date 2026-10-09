@@ -1,3 +1,4 @@
+import { ContributorLink } from "@/components/contributor-link";
 import { createPublicSupabaseClient } from "@/lib/supabase/public";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
@@ -112,7 +113,7 @@ export default async function TestimoniesPage({ searchParams }: { searchParams: 
                   <span>{formatDate(testimony.event_date)}</span><span aria-hidden="true">·</span><span>{testimony.city}، {testimony.country}</span>
                 </div>
                 <h2 className="text-xl font-bold leading-8 text-stone-900 dark:text-stone-100">{testimony.title}</h2>
-                <p className="mt-2 text-xs text-stone-500">مقدم الشهادة: {testimony.author_name}</p>
+                <p className="mt-2 text-xs text-stone-500">مقدم الشهادة: <ContributorLink userId={testimony.created_by} name={testimony.author_name}/></p>
                 <p className="mt-3 whitespace-pre-wrap text-sm leading-8 text-stone-700 dark:text-stone-300">{testimony.description}</p>
                 <p className="mt-4 border-r-2 border-orange-400 pr-3 text-xs leading-6 text-stone-500 dark:text-stone-400">الموقع: {testimony.location_description}</p>
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-stone-100 pt-4 dark:border-stone-800">

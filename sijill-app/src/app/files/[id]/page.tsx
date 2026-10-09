@@ -1,5 +1,7 @@
 "use client";
 
+import { ContributorLink } from "@/components/contributor-link";
+
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -52,7 +54,7 @@ export default function PublicPersonFilePage() {
       <article className="archive-frame archive-frame--file mt-10 p-6 sm:p-9">
         <p className="text-right text-xs text-[#b69a6d]">ملف شخص منشور في الأرشيف</p>
         <h1 className="mt-4 border-b border-white/10 pb-6 text-center text-3xl font-bold sm:text-4xl">{record.title}</h1>
-        <p className="mt-3 text-center text-xs text-stone-500">أُضيف بواسطة: {authorName || "…"}</p>
+        <p className="mt-3 text-center text-xs text-stone-500">أُضيف بواسطة: <ContributorLink userId={record.created_by} name={authorName}/></p>
         <ArchiveMediaHero media={record.media} />
 
         <section className="mt-7 border-t border-white/10 pt-6">

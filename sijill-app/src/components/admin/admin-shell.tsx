@@ -18,6 +18,7 @@ const staffItems = [
 ];
 
 const ownerItems = [
+  { label: "المساهمون وسجل النشاط", href: "/admin/contributors", icon: "◎" },
   { label: "الإشعارات", href: "/admin/notifications", icon: "◉" },
   { label: "الإعدادات", href: "/admin/settings", icon: "⚙" },
 ];

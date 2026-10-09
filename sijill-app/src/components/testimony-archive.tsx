@@ -1,5 +1,7 @@
 "use client";
 
+import { ContributorLink } from "@/components/contributor-link";
+
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import Link from "next/link";
@@ -93,7 +95,7 @@ export function TestimonyArchive({ parentType, parentId }: { parentType: "case" 
             <div className="border-t border-black/10 px-4 py-4 text-sm leading-7 text-stone-200">
               <p className="text-xs text-[#d5c293]">{formatDate(item.event_date)} · {[item.city, item.location_description].filter(Boolean).join("، ") || "الموقع غير محدد"}</p>
               <p className="mt-3 whitespace-pre-wrap">{item.description}</p>
-              <p className="mt-3 text-xs text-stone-400">مقدم الشهادة: {authors[item.created_by ?? ""] ?? "مستخدم سِجِلّ"}</p>
+              <p className="mt-3 text-xs text-stone-400">مقدم الشهادة: <ContributorLink userId={item.created_by} name={authors[item.created_by ?? ""]}/></p>
               <p className="mt-3 border-t border-white/10 pt-3 text-xs text-stone-400">المصدر: {testimonyKinds[item.source_type] ?? "مصدر آخر"} · مستوى التوثيق: {item.evidence_level} من 5</p>
               <p className="mt-2 text-[11px] leading-6 text-stone-500">هذا سجل توثيقي منسوب إلى مقدم الشهادة ومصدرها، ولا يمثل حكماً قضائياً.</p>
             </div>
