@@ -42,7 +42,7 @@ export default function WorkspacePage() {
     if (!supabase) { router.replace("/account?mode=login"); return; }
     void supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { router.replace("/account?mode=login&next=%2Fworkspace"); return; }
-      setUserId(data.user.id); setEmail(data.user.email ?? ""); setReady(true);
+      setUserId(data.user.id); setEmail(data.user.email ?? ""); setMyLanguage(data.user.user_metadata?.preferred_language === "en" ? "en" : "ar"); setReady(true);
     });
   }, [router, supabase]);
 
@@ -78,7 +78,7 @@ export default function WorkspacePage() {
   useEffect(() => { if (ready && ["inbox", "messages"].includes(tab)) void loadConversations(); }, [ready, tab, loadConversations]);
   useEffect(() => {
     if (!supabase || !userId) return;
-    void supabase.from("sijill_public_profiles").select("display_name,preferred_language").eq("user_id", userId).maybeSingle().then(({ data }) => { setMyDisplayName(data?.display_name ?? ""); setMyLanguage(data?.preferred_language === "en" ? "en" : "ar"); });
+    void supabase.from("sijill_public_profiles").select("display_name").eq("user_id", userId).maybeSingle().then(({ data }) => { setMyDisplayName(data?.display_name ?? ""); });
   }, [supabase, userId]);
   useEffect(() => {
     if (!supabase || !selectedConversation) { setMessages([]); return; }
@@ -114,12 +114,11 @@ export default function WorkspacePage() {
   };
   const updateAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!supabase) return;
-    const form = new FormData(event.currentTarget); const displayName = String(form.get("display_name") ?? "").trim(); const password = String(form.get("password") ?? ""); const language = String(form.get("language") ?? "ar");
-    if (!displayName) { setError("أدخل الاسم الذي سيظهر بجانب مساهماتك."); return; }
+    const form = new FormData(event.currentTarget); const password = String(form.get("password") ?? ""); const language = String(form.get("language") ?? "ar");
     setBusy(true); setError("");
-    const { error: updateError } = await supabase.auth.updateUser({ data: { display_name: displayName, preferred_language: language }, ...(password ? { password } : {}) });
+    const { error: updateError } = await supabase.auth.updateUser({ data: { preferred_language: language }, ...(password ? { password } : {}) });
     if (updateError) setError("تعذر حفظ بيانات الحساب. تأكد من كلمة المرور الجديدة ثم أعد المحاولة.");
-    else setNotice("حُفظت إعدادات الحساب والاسم الظاهر.");
+    else setNotice("حُفظت إعدادات الحساب.");
     setBusy(false);
   };
 
@@ -149,9 +148,7 @@ function ConversationPanel({ conversation, messages, userId, onSubmit, busy }: {
 }
 
 function AccountSettings({ onSubmit, busy, email, initialName, initialLanguage }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; busy: boolean; email: string; initialName: string; initialLanguage: "ar" | "en" }) {
-  const [name, setName] = useState(initialName);
   const [language, setLanguage] = useState<"ar" | "en">(initialLanguage);
-  useEffect(() => { if (initialName) setName(initialName); }, [initialName]);
   useEffect(() => { setLanguage(initialLanguage); }, [initialLanguage]);
-  return <form onSubmit={onSubmit} className="mt-6 max-w-2xl space-y-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-[#1a211d] sm:p-7"><h2 className="text-xl font-bold">حسابي</h2><p className="text-sm text-stone-500" dir="ltr">{email}</p><label className="block text-sm font-semibold">الاسم الذي يظهر بجانب مساهماتك<input required name="display_name" value={name} maxLength={120} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><label className="block text-sm font-semibold">كلمة مرور جديدة <span className="font-normal text-stone-500">(اتركها فارغة إن لم ترغب بتغييرها)</span><input name="password" type="password" minLength={8} autoComplete="new-password" className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><label className="block text-sm font-semibold">لغة الحساب<select name="language" value={language} onChange={(event) => setLanguage(event.target.value as "ar" | "en")} className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"><option value="ar">العربية</option><option value="en">English</option></select></label><p className="text-xs leading-6 text-stone-500">يُحفظ اختيار اللغة في إعدادات الحساب، وستُترجم بقية صفحات الموقع ضمن مرحلة التوطين.</p><button disabled={busy} className="rounded-xl bg-[#194537] px-5 py-3 text-sm font-semibold text-white">حفظ الإعدادات</button></form>;
+  return <form onSubmit={onSubmit} className="mt-6 max-w-2xl space-y-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-[#1a211d] sm:p-7"><h2 className="text-xl font-bold">حسابي</h2><p className="text-sm text-stone-500" dir="ltr">{email}</p><label className="block text-sm font-semibold">الاسم الذي يظهر بجانب مساهماتك<input readOnly aria-readonly="true" value={initialName} className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><p className="text-xs text-stone-500">اسمك ثابت منذ التسجيل ولا يمكن تغييره.</p><label className="block text-sm font-semibold">كلمة مرور جديدة <span className="font-normal text-stone-500">(اتركها فارغة إن لم ترغب بتغييرها)</span><input name="password" type="password" minLength={8} autoComplete="new-password" className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"/></label><label className="block text-sm font-semibold">لغة الحساب<select name="language" value={language} onChange={(event) => setLanguage(event.target.value as "ar" | "en")} className="mt-2 w-full rounded-lg border border-stone-300 bg-transparent px-3 py-3 font-normal dark:border-stone-700"><option value="ar">العربية</option><option value="en">English</option></select></label><p className="text-xs leading-6 text-stone-500">يُحفظ اختيار اللغة في إعدادات الحساب، وستُترجم بقية صفحات الموقع ضمن مرحلة التوطين.</p><button disabled={busy} className="rounded-xl bg-[#194537] px-5 py-3 text-sm font-semibold text-white">حفظ الإعدادات</button></form>;
 }

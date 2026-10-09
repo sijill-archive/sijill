@@ -99,6 +99,11 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
       return;
     }
 
+    if (signup && (!firstName.trim() || !lastName.trim() || `${firstName.trim()} ${lastName.trim()}`.length > 120)) {
+      setErrorMessage("أدخل الاسم الأول والأخير؛ يجب ألا يزيد الاسم الكامل على 120 حرفاً.");
+      return;
+    }
+
     setBusy(true);
     try {
       if (recovery) {
@@ -127,7 +132,7 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
             password,
             options: {
               emailRedirectTo: `${SITE_URL}/account?mode=verified`,
-              data: { first_name: firstName.trim(), last_name: lastName.trim(), date_of_birth: birthDate, governorate },
+              data: { display_name: `${firstName.trim()} ${lastName.trim()}`, first_name: firstName.trim(), last_name: lastName.trim(), date_of_birth: birthDate, governorate },
             },
           })
         : await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -237,12 +242,13 @@ export function AccountForm({ mode, nextPath = "/workspace" }: { mode: AccountMo
           {signup && <>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-medium" htmlFor="first-name">الاسم الأول
-                <input id="first-name" name="given-name" autoComplete="given-name" required maxLength={80} value={firstName} onChange={(event) => setFirstName(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-base outline-none transition focus:border-[#527764] focus:ring-2 focus:ring-[#527764]/15 dark:border-stone-700 dark:bg-[#121815]" />
+                <input id="first-name" name="given-name" autoComplete="given-name" required maxLength={59} value={firstName} onChange={(event) => setFirstName(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-base outline-none transition focus:border-[#527764] focus:ring-2 focus:ring-[#527764]/15 dark:border-stone-700 dark:bg-[#121815]" />
               </label>
               <label className="block text-sm font-medium" htmlFor="last-name">الاسم الأخير
-                <input id="last-name" name="family-name" autoComplete="family-name" required maxLength={80} value={lastName} onChange={(event) => setLastName(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-base outline-none transition focus:border-[#527764] focus:ring-2 focus:ring-[#527764]/15 dark:border-stone-700 dark:bg-[#121815]" />
+                <input id="last-name" name="family-name" autoComplete="family-name" required maxLength={59} value={lastName} onChange={(event) => setLastName(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-base outline-none transition focus:border-[#527764] focus:ring-2 focus:ring-[#527764]/15 dark:border-stone-700 dark:bg-[#121815]" />
               </label>
             </div>
+            <p className="text-xs leading-6 text-stone-500">سيظهر اسمك الأول والأخير بجانب مساهماتك، ويُثبت عند التسجيل ولا يمكن تغييره لاحقًا. عند التسجيل عبر Google يُستخدم اسم حساب Google. بريدك وتاريخ ميلادك ومحافظتك متاحة للإدارة فقط.</p>
             <label className="block text-sm font-medium" htmlFor="birth-date">تاريخ الميلاد
               <input id="birth-date" name="bday" autoComplete="bday" type="date" max={new Date().toISOString().slice(0, 10)} required value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-base outline-none transition focus:border-[#527764] focus:ring-2 focus:ring-[#527764]/15 dark:border-stone-700 dark:bg-[#121815]" />
             </label>
