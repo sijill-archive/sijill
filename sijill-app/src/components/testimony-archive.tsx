@@ -5,6 +5,8 @@ import { ContributorLink } from "@/components/contributor-link";
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import Link from "next/link";
+import { ArchiveMediaGallery } from "@/components/archive-media-gallery";
+import type { ArchiveMedia } from "@/lib/archive-media";
 
 type Testimony = {
   id: string;
@@ -17,6 +19,7 @@ type Testimony = {
   source_type: string;
   created_at: string;
   created_by: string | null;
+  media: ArchiveMedia | null;
 };
 
 type Side = "supporting" | "opposing";
@@ -53,7 +56,7 @@ export function TestimonyArchive({ parentType, parentId }: { parentType: "case" 
 
     setCollections((current) => ({ ...current, [side]: { ...current[side], loading: true, error: false } }));
     const parentColumn = parentType === "case" ? "case_id" : "person_file_id";
-    const query = supabase.from("sijill_testimonies").select("id,title,description,event_date,city,location_description,evidence_level,source_type,created_at,created_by", { count: offset === 0 ? "exact" : undefined })
+    const query = supabase.from("sijill_testimonies").select("id,title,description,event_date,city,location_description,evidence_level,source_type,created_at,created_by,media", { count: offset === 0 ? "exact" : undefined })
       .eq(parentColumn, parentId).eq("status", "published").eq("public_consent", true).eq("position", side)
       .order("event_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).range(offset, offset + pageSize - 1);
     const { data, count, error } = await query;
@@ -94,7 +97,7 @@ export function TestimonyArchive({ parentType, parentId }: { parentType: "case" 
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:hidden"><span className="flex min-w-0 items-center gap-3"><span aria-hidden="true" className="text-lg">▤</span><span className="truncate font-semibold">{item.title}</span></span><span className="shrink-0 text-xs text-stone-700">⌄</span></summary>
             <div className="border-t border-black/10 px-4 py-4 text-sm leading-7 text-stone-200">
               <p className="text-xs text-[#d5c293]">{formatDate(item.event_date)} · {[item.city, item.location_description].filter(Boolean).join("، ") || "الموقع غير محدد"}</p>
-              <p className="mt-3 whitespace-pre-wrap">{item.description}</p>
+              <p className="mt-3 whitespace-pre-wrap">{item.description}</p><ArchiveMediaGallery media={item.media}/>
               <p className="mt-3 text-xs text-stone-400">مقدم الشهادة: <ContributorLink userId={item.created_by} name={authors[item.created_by ?? ""]}/></p>
               <p className="mt-3 border-t border-white/10 pt-3 text-xs text-stone-400">المصدر: {testimonyKinds[item.source_type] ?? "مصدر آخر"} · مستوى التوثيق: {item.evidence_level} من 5</p>
               <p className="mt-2 text-[11px] leading-6 text-stone-500">هذا سجل توثيقي منسوب إلى مقدم الشهادة ومصدرها، ولا يمثل حكماً قضائياً.</p>

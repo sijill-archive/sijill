@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { CaseSearchPicker, type CaseOption } from "@/components/case-search-picker";
 import { GeographySelects } from "@/components/geography-selects";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { geography } from "@/lib/geography";
@@ -14,8 +15,8 @@ export default function NewFilePage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [preview, setPreview] = useState<{ title: string; description: string; location: string; caseIds: string[]; caseTitles: string[] } | null>(null);
-  const [cases, setCases] = useState<{ id: string; title: string }[]>([]);
-  const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
+  const [selectedCases, setSelectedCases] = useState<CaseOption[]>([]);
+  const [formResetKey, setFormResetKey] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -26,10 +27,11 @@ export default function NewFilePage() {
     void supabase.auth.getSession().then(async ({ data }) => {
       if (data.session) {
         setReady(true);
-        const result = await supabase.from("sijill_cases").select("id,title").eq("status", "published").order("title", { ascending: true }).limit(500);
-        setCases(result.data ?? []);
         const selectedCase = new URLSearchParams(window.location.search).get("caseId");
-        if (selectedCase) setSelectedCaseIds([selectedCase]);
+        if (selectedCase && /^[0-9a-f-]{36}$/i.test(selectedCase)) {
+          const result = await supabase.from("sijill_cases").select("id,title,aliases,governorate,district_name,city,event_date,approximate_date").eq("status", "published").eq("id", selectedCase).maybeSingle();
+          if (result.data) setSelectedCases([result.data]);
+        }
       }
       else router.replace("/account?mode=login&next=%2Ffiles%2Fnew");
     });
@@ -38,13 +40,14 @@ export default function NewFilePage() {
   const showPreview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
+    try { validateArchiveMedia(values); } catch (error) { setErrorMessage(error instanceof Error ? error.message : "تحقق من المرفقات."); return; }
     const cityChoice = String(values.get("city") ?? "");
     const city = cityChoice === "__other__" ? String(values.get("cityOther") ?? "") : cityChoice;
     const governorate = String(values.get("governorate") ?? "");
     const districtId = String(values.get("district") ?? "");
     const district = geography.governorates.find((item) => item.name === governorate)?.districts.find((item) => item.id === districtId);
     const caseIds = values.getAll("caseIds").map(String);
-    const caseTitles = cases.filter((item) => caseIds.includes(item.id)).map((item) => item.title);
+    const caseTitles = selectedCases.filter((item) => caseIds.includes(item.id)).map((item) => item.title);
     const location = [governorate, district?.name, city].filter(Boolean).join("، ");
     setErrorMessage("");
     setMessage("");
@@ -105,7 +108,8 @@ export default function NewFilePage() {
       setMessage("أُرسل الملف إلى لوحة الإدارة للمراجعة. سيظهر للزوار بعد اعتماده ونشره.");
       setPreview(null);
       form.reset();
-      setSelectedCaseIds([]);
+      setSelectedCases([]);
+      setFormResetKey((key) => key + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Failed to submit Sijill person file", error);
@@ -143,7 +147,7 @@ export default function NewFilePage() {
 
           <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
             <div><h2 className="text-lg font-semibold">القضايا المرتبطة بالشخص</h2><p className="mt-1 text-sm text-stone-500">يمكن ربط ملف الشخص بأكثر من قضية منشورة، وسيظهر الملف تحت كل قضية.</p></div>
-            {cases.length === 0 ? <p className="text-xs text-stone-500">ستظهر هنا القضايا بعد اعتمادها ونشرها.</p> : <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-stone-300 p-3 dark:border-stone-700">{cases.map((item) => <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-stone-50 dark:hover:bg-stone-800"><input type="checkbox" name="caseIds" value={item.id} checked={selectedCaseIds.includes(item.id)} onChange={(event) => setSelectedCaseIds((current) => event.target.checked ? [...current, item.id] : current.filter((caseId) => caseId !== item.id))} className="size-4 accent-[#194537]" /><span>{item.title}</span></label>)}</div>}
+            <CaseSearchPicker selected={selectedCases} onChange={setSelectedCases} />
           </section>
 
           <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
@@ -151,7 +155,7 @@ export default function NewFilePage() {
             <GeographySelects idPrefix="file-location" />
           </section>
 
-          <ArchiveMediaFields />
+          <ArchiveMediaFields key={formResetKey} />
 
           <section className="rounded-xl border border-[#e4dfd2] bg-[#f7f5ee] p-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900">
             <h2 className="font-semibold">تنبيه توثيقي</h2>

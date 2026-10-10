@@ -8,6 +8,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { GeographySelects } from "@/components/geography-selects";
 import { ArchiveMediaFields } from "@/components/archive-media-fields";
 import { uploadArchiveMedia, validateArchiveMedia } from "@/lib/archive-media";
+import { CaseAliasesField, parseCaseAliases } from "@/components/case-aliases-field";
 import { geography } from "@/lib/geography";
 
 const eventTypes = ["قصف أو هجوم", "اعتقال أو اختفاء", "تهجير أو نزوح", "انتهاك", "حدث مدني", "أخرى"];
@@ -36,7 +37,8 @@ export default function NewCasePage() {
     setMessage("");
     setErrorMessage("");
     const values = new FormData(event.currentTarget);
-    try { validateArchiveMedia(values); }
+    let aliases: string[];
+    try { validateArchiveMedia(values); aliases = parseCaseAliases(values); }
     catch (error) { setErrorMessage(error instanceof Error ? error.message : "تحقق من المرفقات."); return; }
     const governorateName = String(values.get("governorate") ?? "");
     const districtId = String(values.get("district") ?? "");
@@ -77,6 +79,7 @@ export default function NewCasePage() {
       const { data: created, error } = await supabase.from("sijill_cases").insert({
         created_by: user.id,
         title,
+        aliases,
         event_type: String(values.get("eventType") ?? "أخرى"),
         description,
         country: String(values.get("country") ?? "سوريا").trim() || "سوريا",
@@ -141,6 +144,7 @@ export default function NewCasePage() {
             <label className="block text-sm font-medium">عنوان القضية
               <input required maxLength={180} name="title" placeholder="مثال: حدث في حي بابا عمرو" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]" />
             </label>
+            <CaseAliasesField />
             <label className="block text-sm font-medium">نوع الحدث
               <select required name="eventType" defaultValue="" className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 outline-none focus:border-[#527764] dark:border-stone-700 dark:bg-[#121815]"><option value="" disabled>اختر نوع الحدث</option>{eventTypes.map((type) => <option key={type}>{type}</option>)}</select>
             </label>
@@ -183,7 +187,7 @@ export default function NewCasePage() {
 
           <section className="space-y-4 border-t border-stone-100 pt-6 dark:border-stone-800">
             <h2 className="text-lg font-semibold">مواد ومصادر داعمة</h2>
-            <ArchiveMediaFields />
+            <ArchiveMediaFields key={formResetKey} />
           </section>
 
           <section className="rounded-xl border border-[#e4dfd2] bg-[#f7f5ee] p-4 text-sm leading-7 dark:border-stone-700 dark:bg-stone-900">
