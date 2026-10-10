@@ -43,7 +43,7 @@ export function validateArchiveMedia(data: FormData): { images: File[]; videos: 
 
 export async function uploadArchiveMedia(
   supabase: SupabaseClient,
-  kind: "cases" | "files",
+  kind: "cases" | "files" | "testimonies",
   recordId: string,
   data: FormData,
 ): Promise<ArchiveMedia> {

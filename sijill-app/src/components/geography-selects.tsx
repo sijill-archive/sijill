@@ -7,14 +7,16 @@ type GeographySelectsProps = {
   required?: boolean;
   idPrefix: string;
   className?: string;
+  initial?: { governorate?: string | null; district_id?: string | null; city?: string | null };
 };
 
 const inputClass = "mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#527764] disabled:opacity-50 dark:border-stone-700 dark:bg-[#121815]";
 
-export function GeographySelects({ required = false, idPrefix, className = "" }: GeographySelectsProps) {
-  const [governorateName, setGovernorateName] = useState("");
-  const [districtId, setDistrictId] = useState("");
-  const [cityChoice, setCityChoice] = useState("");
+export function GeographySelects({ required = false, idPrefix, className = "", initial }: GeographySelectsProps) {
+  const [governorateName, setGovernorateName] = useState(initial?.governorate ?? "");
+  const [districtId, setDistrictId] = useState(initial?.district_id ?? "");
+  const initialDistrict = geography.governorates.find((item) => item.name === initial?.governorate)?.districts.find((item) => item.id === initial?.district_id);
+  const [cityChoice, setCityChoice] = useState(initial?.city ? initialDistrict?.places.some((place) => place.name === initial.city) ? initial.city : "__other__" : "");
   const governorate = geography.governorates.find((item) => item.name === governorateName);
   const districts = governorate?.districts ?? [];
   const selectedDistrict = districts.find((item) => item.id === districtId);
@@ -42,7 +44,7 @@ export function GeographySelects({ required = false, idPrefix, className = "" }:
           {places.map((place) => <option key={place.slug || place.name} value={place.name}>{place.name}</option>)}
           <option value="__other__">مكان غير مدرج</option>
         </select>
-        {cityChoice === "__other__" && <input name="cityOther" required={required} maxLength={120} placeholder="اكتب اسم المدينة أو القرية" className={inputClass} />}
+        {cityChoice === "__other__" && <input name="cityOther" defaultValue={initial?.city ?? ""} required={required} maxLength={120} placeholder="اكتب اسم المدينة أو القرية" className={inputClass} />}
       </label>
       {!required && <p className="sm:col-span-3 -mt-2 text-xs leading-6 text-stone-500 dark:text-stone-400">الموقع اختياري في ملف الشخص. اترك الخيارات فارغة إذا لم تكن المعلومة معروفة أو لا تنطبق.</p>}
       {otherPlaces && required && <p className="sm:col-span-3 -mt-2 text-xs leading-6 text-stone-500 dark:text-stone-400">يمكنك اختيار «مكان غير مدرج» وكتابة اسم القرية أو الموقع يدوياً.</p>}
